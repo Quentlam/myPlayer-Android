@@ -24,7 +24,7 @@ fun HomeScreen() {
     val items = listOf(
         BottomNavItem("好友", Icons.Default.Person, "friends"),
         BottomNavItem("聊天", Icons.Default.MailOutline, "chat"),
-        BottomNavItem("设置", Icons.Default.Settings, "settings"),
+        BottomNavItem("播放室", Icons.Default.PlayArrow, "playroom"),
         BottomNavItem("我的", Icons.Default.Person, "Me")
     )
     
@@ -55,7 +55,7 @@ fun HomeScreen() {
         ) {
             composable("friends")  { FriendsScreen() }
             composable("chat")     { ChatScreen() }
-            composable("settings") { SettingsScreen() }
+            composable("Me")       { SettingsScreen() }
             composable("playroom") { playroomScreen() }
         }
     }
