@@ -47,7 +47,8 @@ fun HomeScreen() {
                 }
             }
         }
-    ) { innerPadding ->
+    ) {
+        innerPadding ->
         NavHost(
             navController,
             startDestination = "friends",
