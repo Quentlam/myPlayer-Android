@@ -12,6 +12,11 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.myplayer.framework.chat.ChatScreen
+import com.example.myplayer.framework.friend.FriendsScreen
+import com.example.myplayer.framework.me.SettingsScreen
+import com.example.myplayer.framework.playroom.playroomScreen
+
 ////11
 @Composable
 fun HomeScreen() {
@@ -51,6 +56,7 @@ fun HomeScreen() {
             composable("friends")  { FriendsScreen() }
             composable("chat")     { ChatScreen() }
             composable("settings") { SettingsScreen() }
+            composable("playroom") { playroomScreen() }
         }
     }
 }
@@ -66,41 +72,5 @@ data class BottomNavItem(
     val route: String
 )
 
-@Composable
-fun FriendsScreen() {
-    var searchQuery by remember { mutableStateOf("") }
-    
-    Column(modifier = Modifier.padding(16.dp)) {
-        TextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            label = { Text("搜索好友") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Button(
-            onClick = { /* 搜索好友逻辑 */ },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("搜索")
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // 好友列表
-    }
-}
 
-@Composable
-fun ChatScreen() {
-    // 聊天界面实现
-    Text("聊天界面")
-}
 
-@Composable
-fun SettingsScreen() {
-    // 设置界面实现
-    Text("设置界面")
-}
