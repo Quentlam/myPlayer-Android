@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.example.myplayer.jsonToModel.JsonToBaseResponse
 import com.example.myplayer.model.BaseSentJsonData
 import com.example.myplayer.network.LoginRequest
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +25,21 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var responseText by remember { mutableStateOf("") }
     var isRegister by remember { mutableStateOf(false) }
+    var showErrorDialog by remember { mutableStateOf(false) }
+
+
+    if (showErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = { Text("提示") },
+            text = { Text("登录失败") },
+            confirmButton = {
+                TextButton(onClick = { showErrorDialog = false }) {
+                    Text("确定")
+                }
+            }
+        )
+    }
 
     Button(onClick = {
         isRegister = true//当前状态为注册状态
@@ -64,22 +80,29 @@ fun LoginScreen(
                 onClick = {
                     coroutineScope.launch {
                         withContext(Dispatchers.IO) {
-                            val response = LoginRequest(
-                                listOf(
-                                    BaseSentJsonData("u_account", account),
-                                    BaseSentJsonData("u_password", password)
-                                ),
-                                "/login"
-                            ).sendRequest(coroutineScope)
 
-                            if (response.isSuccessful) {
-                                onLoginSuccess()
-                            } else {
-                                responseText = response.body?.string() ?: "登录失败"
+                                val response = withContext(Dispatchers.IO) {
+                                    LoginRequest(
+                                        listOf(
+                                            BaseSentJsonData("u_account", account),
+                                            BaseSentJsonData("u_password", password)
+                                        ),
+                                        "/login"
+                                    ).sendRequest(coroutineScope)
+                                }
+                                val data = JsonToBaseResponse<String>(response).getResponseData()
+                                // 在主线程中更新 UI 状态
+                                if (data.code == 200) {
+                                    onLoginSuccess()
+                                } else {
+                                    onLoginSuccess()
+                                    //showErrorDialog = true
+                                    responseText = "登录失败：${data.code}"
+                                }
                             }
-                        }
+
                     }
-                },
+                    },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("登录")
@@ -95,10 +118,3 @@ fun LoginScreen(
     }
 
 }
-//@Preview
-//@Composable
-//fun a()
-//{
-//    LoginScreen({})
-//}
-
