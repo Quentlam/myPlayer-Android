@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("kotlin-kapt")
 }
 
 android {
@@ -60,4 +61,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.0")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("androidx.navigation:navigation-compose:2.5.3")
+
+
+    val room_version = "2.6.1" // 或更新版本
+    implementation("androidx.room:room-runtime:$room_version")
+    implementation("androidx.room:room-ktx:$room_version") // 重要！支持协程
+    kapt("androidx.room:room-compiler:$room_version")
 }
