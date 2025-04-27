@@ -78,7 +78,7 @@ fun RegisterScreen(
                         "/register"
                     ).sendRequest(coroutineScope)
                     
-                    responseText = response.body?.string() ?: ""
+                    responseText = response!!.body?.string() ?: ""
                 }
             }
         }) {

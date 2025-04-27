@@ -169,7 +169,7 @@ package com.example.myplayer
         var verificationCode by remember { mutableStateOf("") }
         var attributesOfName = listOf("账号", "密码", "确认密码", "验证码")
         var baseResponse by remember { mutableStateOf<BaseResponseJsonData<String>>(BaseResponseJsonData<String>())}//用来接受响应体
-
+        var responseText by remember { mutableStateOf("") }
 
 
         val coroutineScope = rememberCoroutineScope()
@@ -194,9 +194,24 @@ package com.example.myplayer
                             ),
                             "/login"
                         ).sendRequest(coroutineScope)//创建一个request对象
-                        if (!response.isSuccessful) throw IOException("请求失败: ${response.code}")
+                        if (!response!!.isSuccessful) throw IOException("请求失败: ${response.code}")
                         else
-                        baseResponse = JsonToBaseResponse<String>(response).getResponseData()
+                        // 修改后代码片段：
+                        if (response != null && response!!.isSuccessful) {
+                            try {
+                                val responseBody = response!!.body?.string()
+                                if (!responseBody.isNullOrEmpty()) {
+                                    baseResponse = JsonToBaseResponse<String>(response!!).getResponseData()
+                                    withContext(Dispatchers.Main) {
+                                        responseText = responseBody
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    responseText = "响应解析异常"
+                                }
+                            }
+                        }
                     }
                 }
             })
