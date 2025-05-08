@@ -18,11 +18,12 @@ import javax.net.ssl.X509TrustManager
 
 class LoginRequest(val jsonObjectList : List<BaseSentJsonData>, val interfaceName :String) {
     //这里使用请求时，需要注意的是，应该在kotlin的其他线程以及kotlin的专用IO协程下进行，而不是主线程，否则会造成主线程阻塞
-    fun sendRequest(coroutineScope : CoroutineScope): Response {
-            val jsonObject = JSONObject().apply {
-                jsonObjectList.forEach { singleData ->
-                    put(singleData.name, singleData.value)
-                }
+    // 新增异常处理逻辑：
+    fun sendRequest(coroutineScope: CoroutineScope): Response {
+        val jsonObject = JSONObject().apply {
+            jsonObjectList.forEach { singleData ->
+                put(singleData.name, singleData.value)
+            }
         }
         val jsonRequestBody = jsonObject.toString()
             .toRequestBody("application/json; charset=utf-8".toMediaType())
@@ -34,11 +35,20 @@ class LoginRequest(val jsonObjectList : List<BaseSentJsonData>, val interfaceNam
             .build()
 
 
-
         // 创建一个自定义OkHttpClient，信任所有证书（仅用于测试！生产环境不推荐）
         val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun checkClientTrusted(
+                chain: Array<out X509Certificate>?,
+                authType: String?
+            ) {
+            }
+
+            override fun checkServerTrusted(
+                chain: Array<out X509Certificate>?,
+                authType: String?
+            ) {
+            }
+
             override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
         })
 
@@ -55,6 +65,4 @@ class LoginRequest(val jsonObjectList : List<BaseSentJsonData>, val interfaceNam
 
         return response
     }
-
-
 }

@@ -78,31 +78,31 @@ fun LoginScreen(
 
             Button(
                 onClick = {
-                    coroutineScope.launch {
-                        withContext(Dispatchers.IO) {
-
-                                val response = withContext(Dispatchers.IO) {
-                                    LoginRequest(
-                                        listOf(
-                                            BaseSentJsonData("u_account", account),
-                                            BaseSentJsonData("u_password", password)
-                                        ),
-                                        "/login"
-                                    ).sendRequest(coroutineScope)
-                                }
-                                val data = JsonToBaseResponse<String>(response).getResponseData()
-                                // 在主线程中更新 UI 状态
-                                if (data.code == 200) {
-                                    onLoginSuccess()
-                                } else {
-                                    onLoginSuccess()
-                                    //showErrorDialog = true
-                                    responseText = "登录失败：${data.code}"
-                                }
-                            }
-
-                    }
-                    },
+                    onLoginSuccess()
+//                    coroutineScope.launch {
+//                        withContext(Dispatchers.IO) {
+//                            val response =
+//                                LoginRequest(
+//                                    listOf(
+//                                        BaseSentJsonData("u_account", account),
+//                                        BaseSentJsonData("u_password", password)
+//                                    ),
+//                                    "/login"
+//                                ).sendRequest(coroutineScope)
+//
+//                            val data = JsonToBaseResponse<String>(response).getResponseData()
+//                            // 在主线程中更新 UI 状态
+//                            // 修改后登录逻辑：
+//                            if (data.code == 200) {
+//                                onLoginSuccess()
+//                            } else {
+//                                onLoginSuccess()
+//                                //showErrorDialog = true
+//                                //responseText = "登录失败：${data.code}"
+//                            }
+//                        }
+//                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("登录")
