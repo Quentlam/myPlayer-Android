@@ -11,7 +11,7 @@ data class BaseSentJsonData(
 //这个是对应服务器返回来的每个Json变量
 //用来接收
 data class BaseResponseJsonData<T>(
-    val message: String? = null,
+    val msg: String? = null,
     val code: Int? = null,
     val data: T? = null,
     val token: String? = null

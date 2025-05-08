@@ -1,58 +1,80 @@
 package com.example.myplayer.network.interceptor
 
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
-import com.example.myplayer.model.BaseResponseJsonData
 import com.example.myplayer.model.BaseSentJsonData
 import com.example.myplayer.network.BaseInformation
 import com.example.myplayer.network.LoginRequest
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
+import okhttp3.Request
 import okhttp3.Response
 
 class TokenRefreshInterceptor(
     private val coroutineScope: CoroutineScope
 ) : Interceptor {
+    @Volatile
+    private var isRefreshing = false
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
-        var response = chain.proceed(originalRequest)
 
-        if (response.code == 401) {
-            // 当收到401响应时，启动一个协程来刷新token
-            var newToken: String? = null
-            coroutineScope.launch {
-                newToken = refreshToken(coroutineScope)
-            }
+        // 添加token到请求头
+        val requestWithToken = addTokenToRequest(originalRequest)
+        var response = chain.proceed(requestWithToken)
 
-            // 等待token刷新完成
-            while (newToken == null) {
-                Thread.sleep(100) // 简单等待，避免忙等
-            }
+        // 如果返回401（未授权），尝试刷新token
+        if (response.code == 401 && !isRefreshing) {
+            synchronized(this) {
+                if (!isRefreshing) {
+                    isRefreshing = true
 
-            if (newToken != null) {
-                val newRequest = originalRequest.newBuilder()
-                    .header("Authorization", "Bearer $newToken")
-                    .build()
+                    // 使用 runBlocking 确保token刷新完成
+                    val newToken = runBlocking {
+                        refreshToken()
+                    }
 
-                response.close() // 关闭旧的响应
-                return chain.proceed(newRequest) // 发起新请求
+                    isRefreshing = false
+
+                    if (newToken != null) {
+                        // 更新存储的token
+                        BaseInformation.token = newToken
+
+                        // 使用新token重试请求
+                        response.close()
+                        val newRequest = addTokenToRequest(originalRequest)
+                        return chain.proceed(newRequest)
+                    }
+                }
             }
         }
-
         return response
     }
 
-    private suspend fun refreshToken(coroutineScope : CoroutineScope): String? {
-        // 执行网络请求以获取新token
-        val response = LoginRequest(
-            listOf(
-                BaseSentJsonData("u_account", BaseInformation.account),
-                BaseSentJsonData("u_password", BaseInformation.password)
-            ), "/login"
-        ).sendRequest(coroutineScope)
+    private fun addTokenToRequest(request: Request): Request {
+        // 如果当前token存在，添加到请求头
+        return if (BaseInformation.token.isNotEmpty()) {
+            request.newBuilder()
+                .header("Authorization", "Bearer ${BaseInformation.token}")
+                .build()
+        } else {
+            request
+        }
+    }
 
-        val baseResponse = JsonToBaseResponse<String>(response).getResponseData()
-        return baseResponse.token
+    private suspend fun refreshToken(): String? {
+        return try {
+            val response = LoginRequest(
+                listOf(
+                    BaseSentJsonData("u_account", BaseInformation.account),
+                    BaseSentJsonData("u_password", BaseInformation.password)
+                ), "/login"
+            ).sendRequest(coroutineScope)
+
+            val baseResponse = JsonToBaseResponse<String>(response).getResponseData()
+            baseResponse.data
+        } catch (e: Exception) {
+            null
+        }
     }
 }
