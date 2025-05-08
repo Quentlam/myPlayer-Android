@@ -99,10 +99,11 @@ fun LoginScreen(
                                 BaseInformation.account = account
                                 BaseInformation.password = password
                                 BaseInformation.token = data.data
-                                Log.e("登录成功：",data.toString())
+                                Log.e("loginScreen",data.toString())
+                                Log.e("loginScreen-token",BaseInformation.token)
                             } else {
                                 showErrorDialog = true
-                                data.msg?.let { Log.e("登录失败：", it) }
+                                data.msg?.let { Log.e("loginScreen", it) }
                             }
                         }
                     }

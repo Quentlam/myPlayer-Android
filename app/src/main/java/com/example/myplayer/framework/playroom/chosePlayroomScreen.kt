@@ -1,5 +1,6 @@
 package com.example.myplayer.framework.playroom
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,7 +31,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,10 +47,25 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.room.util.copy
+import com.example.myplayer.jsonToModel.JsonToBaseResponse
+import com.example.myplayer.model.BaseResponseJsonData
+import com.example.myplayer.network.BaseInformation
 import com.example.myplayer.network.BaseInformation.currentRoom
-import com.example.myplayer.network.DatabaseProvider
+import com.example.myplayer.network.BaseRequest
+import com.example.myplayer.network.networkAPI.GetRequest
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.Request
 import okhttp3.Response
 
 
@@ -82,29 +99,31 @@ private fun PlayroomListItem(
     val scope = rememberCoroutineScope()
     var showManageDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    // 使用State而不是StateList以避免集合操作问题
-    var playrooms by remember { mutableStateOf<Flow<List<Playroom>>>(flowOf(emptyList())) }
-    var response by remember { mutableStateOf<Response?>(null) }
-    val wsClient = remember { WebSocketClient(scope) }
-    var message by remember { mutableStateOf("") }
-    val navController = rememberNavController()
 
-    val context = LocalContext.current
+    // 修改状态声明
+    var isLoading by remember { mutableStateOf(true) }
+    var playrooms by remember { mutableStateOf<List<Playroom>>(emptyList()) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    // 使用try-catch包裹数据库操作
+    // 使用 collectAsState 来收集 Flow
     LaunchedEffect(Unit) {
-                val dao = DatabaseProvider.getDatabase(context).playroomDao()
-                // 插入数据
-                val playroom = Playroom(
-                    r_id = "124",
-                    r_name = "游戏室2",
-                    r_avatar = "avatar_url",
-                    r_introduction = "这是一个游戏室",
-                    current_url = "none"
-                )
-                dao.insertPlayroom(playroom)
-                // 查询数据
-                playrooms = dao.getAllPlayrooms()
+        try {
+            withContext(Dispatchers.IO) {
+                getAllPlayrooms(scope)
+                    .collect { rooms ->
+                        withContext(Dispatchers.Main) {
+                            playrooms = rooms ?: emptyList()
+                            isLoading = false
+                        }
+                    }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                error = e.message
+                isLoading = false
+                Log.e("Playrooms", "Error loading playrooms: ${e.message}")
+            }
+        }
     }
 
     Scaffold(
@@ -122,32 +141,102 @@ private fun PlayroomListItem(
                 onAddClick = { /* 创建新播放室逻辑 */ }
             )
         }
-    ) {
-        padding ->
+    ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-// 然后在 LazyColumn 中使用 collectAsState
-            val playroomsList by playrooms.collectAsState(initial = emptyList())
-            // 播放室列表，这里是把从数据库里拿到的播放室都摆到中间键里，也就是加载播放室列表
-            LazyColumn {
-                itemsIndexed(playroomsList) { index, room ->
-                    var room = playroomsList[index]
-                    room.current_url = "http://10.61.164.47:9990/test.mp4"//测试用
-                    PlayroomItem(
-                        room = room,
-                        onJoin = {
-                            currentRoom = room
-                            showManageDialog = true
-                            localNavController.navigate("room/${room.r_id}?videoUrl=${room.current_url}")
-                        },
-                        onManage = {
-
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else if (error != null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("加载失败: $error", color = Color.Red)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = {
+                            error = null
+                            isLoading = true
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        getAllPlayrooms(scope)
+                                            .collect { rooms ->
+                                                withContext(Dispatchers.Main) {
+                                                    playrooms = rooms ?: emptyList()
+                                                    isLoading = false
+                                                }
+                                            }
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        error = e.message
+                                        isLoading = false
+                                    }
+                                }
+                            }
+                        }) {
+                            Text("重试")
                         }
-                    )
+                    }
+                }
+            } else if (playrooms.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("暂无播放室")
+                }
+            } else {
+                LazyColumn {
+                    items(playrooms) { room ->
+                        room.current_url = "http://10.61.164.47:9990/test.mp4"
+
+                        PlayroomItem(
+                            room = room,
+                            onJoin = {
+                                currentRoom = room
+                                showManageDialog = true
+                                localNavController.navigate("room/${room.r_id}?videoUrl=${room.current_url}")
+                            },
+                            onManage = {}
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+suspend fun getAllPlayrooms(coroutineScope: CoroutineScope): Flow<List<Playroom>> = flow {
+    try {
+        val request = GetRequest(
+            interfaceName = "/room/getrooms",
+            queryParams = mapOf()
+        )
+        val response = request.execute(coroutineScope)
+        val gson = Gson()
+        val type = object : TypeToken<BaseResponseJsonData<List<Playroom>>>() {}.type
+        val data = gson.fromJson<BaseResponseJsonData<List<Playroom>>>(response.body?.string(), type)
+
+        if (data.data != null) {
+            Log.d("Playrooms", "获取播放室列表成功：${data.data}")
+            emit(data.data)
+        } else {
+            Log.e("Playrooms", "获取播放室列表失败：${data.msg}")
+            emit(emptyList())
+        }
+    } catch (e: Exception) {
+        Log.e("Playrooms", "获取播放室列表异常：${e.message}")
+        throw e
+    }
+}.flowOn(Dispatchers.IO)
+
+
 
 @Composable
 private fun PlayroomItem(room: Playroom, onJoin: () -> Unit, onManage: () -> Unit)
