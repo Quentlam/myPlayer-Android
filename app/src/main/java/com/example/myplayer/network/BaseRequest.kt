@@ -1,8 +1,11 @@
 package com.example.myplayer.network
 
+import android.util.Log
 import com.example.myplayer.model.BaseSentJsonData
 import com.example.myplayer.network.interceptor.TokenRefreshInterceptor
 import kotlinx.coroutines.CoroutineScope
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -16,47 +19,64 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 
-//这个请求会被拦截器拦截，并且会被加上token
-class BaseRequest(val jsonObjectList : List<BaseSentJsonData>, val interfaceName :String) {
-    //这里使用请求时，需要注意的是，应该在kotlin的其他线程以及kotlin的专用IO协程下进行，而不是主线程，否则会造成主线程阻塞
-    fun sendRequest(coroutineScope: CoroutineScope): Response {
-
-
+class BaseRequest(val jsonObjectList: List<BaseSentJsonData>, val interfaceName: String) {
+    fun sendPostRequest(coroutineScope: CoroutineScope): Response {
         val jsonObject = JSONObject().apply {
             jsonObjectList.forEach { singleData ->
                 put(singleData.name, singleData.value)
             }
         }
+
         val jsonRequestBody = jsonObject.toString()
             .toRequestBody("application/json; charset=utf-8".toMediaType())
 
         val request = Request.Builder()
             .url(BaseInformation.HOST + interfaceName)
             .post(jsonRequestBody)
-            .header("Content-Type", "application/json")
             .build()
 
+        // 使用单例模式获取OkHttpClient实例
+        val client = getOkHttpClient(coroutineScope)
+        return client.newCall(request).execute()
+    }
 
+    companion object {
+        @Volatile
+        private var okHttpClient: OkHttpClient? = null
 
-        // 创建一个自定义OkHttpClient，信任所有证书（仅用于测试！生产环境不推荐）
-        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        })
+        fun getOkHttpClient(coroutineScope: CoroutineScope): OkHttpClient {
+            return okHttpClient ?: synchronized(this) {
+                okHttpClient ?: createOkHttpClient(coroutineScope).also { okHttpClient = it }
+            }
+        }
 
-        val sslContext = SSLContext.getInstance("SSL")
-        sslContext.init(null, trustAllCerts, SecureRandom())
+        private fun createOkHttpClient(coroutineScope: CoroutineScope): OkHttpClient {
+            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            })
 
-        val client = OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-            .hostnameVerifier { _, _ -> true }
-            .addInterceptor(TokenRefreshInterceptor(coroutineScope))
-            .build()
-        //以上三段代码是创建了一个信任任何证书的请求对象
+            val sslContext = SSLContext.getInstance("SSL")
+            sslContext.init(null, trustAllCerts, SecureRandom())
 
-        val response = client.newCall(request).execute()
-
-        return response
+            return OkHttpClient.Builder()
+                .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+                .hostnameVerifier { _, _ -> true }
+                .addInterceptor(TokenRefreshInterceptor(coroutineScope))
+                .addInterceptor { chain ->
+                    val request = chain.request()
+                    // 打印请求头
+                    Log.e("BaseRequest", "Request Headers:")
+                    request.headers.forEach { (name, value) ->
+                        Log.e("BaseRequest", "$name: $value")
+                    }
+                    chain.proceed(request)
+                }
+                .build()
+        }
     }
 }
+
+
+

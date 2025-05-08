@@ -1,5 +1,6 @@
 package com.example.myplayer.network.interceptor
 
+import android.util.Log
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
 import com.example.myplayer.model.BaseSentJsonData
 import com.example.myplayer.network.BaseInformation
@@ -18,32 +19,35 @@ class TokenRefreshInterceptor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
+        println("TokenRefreshInterceptor is called") // 添加日志输出
+        // 如果是登录请求，直接放行不添加token
+        if (originalRequest.url.encodedPath.endsWith("/login")) {
+            return chain.proceed(originalRequest)
+        }
 
-        // 添加token到请求头
         val requestWithToken = addTokenToRequest(originalRequest)
         var response = chain.proceed(requestWithToken)
 
-        // 如果返回401（未授权），尝试刷新token
         if (response.code == 401 && !isRefreshing) {
             synchronized(this) {
                 if (!isRefreshing) {
                     isRefreshing = true
 
-                    // 使用 runBlocking 确保token刷新完成
-                    val newToken = runBlocking {
-                        refreshToken()
-                    }
+                    try {
+                        val newToken = runBlocking {
+                            refreshToken()
+                        }
 
-                    isRefreshing = false
+                        if (newToken != null) {
+                            BaseInformation.token = newToken
+                            response.close()
 
-                    if (newToken != null) {
-                        // 更新存储的token
-                        BaseInformation.token = newToken
-
-                        // 使用新token重试请求
-                        response.close()
-                        val newRequest = addTokenToRequest(originalRequest)
-                        return chain.proceed(newRequest)
+                            // 使用新token重试原始请求
+                            val newRequest = addTokenToRequest(originalRequest)
+                            return chain.proceed(newRequest)
+                        }
+                    } finally {
+                        isRefreshing = false
                     }
                 }
             }
@@ -52,18 +56,36 @@ class TokenRefreshInterceptor(
     }
 
     private fun addTokenToRequest(request: Request): Request {
-        // 如果当前token存在，添加到请求头
-        return if (BaseInformation.token.isNotEmpty()) {
-            request.newBuilder()
-                .header("Authorization", "Bearer ${BaseInformation.token}")
-                .build()
-        } else {
+        return try {
+            if (BaseInformation.token.isNotEmpty()) {
+                Log.d("TokenRefreshInterceptor", "Adding token to request: ${request.url}")
+                request.newBuilder()
+                    .header("Authorization", BaseInformation.token)
+                    .header("Accept", "application/json, text/plain, */*")
+                    .header("User-Agent", "MyPlayer-Android")
+                    // 移除 Content-Type header，因为 GET 请求通常不需要
+                    // 只在有请求体的情况下添加 Content-Type
+                    .apply {
+                        if (request.body != null) {
+                            addHeader("Content-Type", "application/json")
+                        }
+                    }
+                    // Referer 可能导致问题，如果不是必需可以移除
+                    // .header("Referer", "https://www.myplayer.merlin.xin/home/playroom")
+                    .build()
+            } else {
+                Log.w("TokenRefreshInterceptor", "No token available, proceeding with original request")
+                request
+            }
+        } catch (e: Exception) {
+            Log.e("TokenRefreshInterceptor", "Error adding headers: ${e.message}", e)
+            // 如果添加头部失败，返回原始请求而不是崩溃
             request
         }
     }
 
     private suspend fun refreshToken(): String? {
-        return try {
+        try {
             val response = LoginRequest(
                 listOf(
                     BaseSentJsonData("u_account", BaseInformation.account),
@@ -71,10 +93,15 @@ class TokenRefreshInterceptor(
                 ), "/login"
             ).sendRequest(coroutineScope)
 
+            if (!response.isSuccessful) {
+                return null
+            }
+
             val baseResponse = JsonToBaseResponse<String>(response).getResponseData()
-            baseResponse.data
+            return baseResponse.data
         } catch (e: Exception) {
-            null
+            e.printStackTrace()
+            return null
         }
     }
 }
