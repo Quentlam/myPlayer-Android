@@ -96,7 +96,7 @@ Authorization: token
 
 #### 1.5 获取用户信息
 
-**接口地址**: `/home/gatuserinfo`
+**接口地址**: `/user/getuserinfo`
 **请求方法**: `GET`
 **请求头**:
 

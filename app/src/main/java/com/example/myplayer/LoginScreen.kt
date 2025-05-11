@@ -1,32 +1,49 @@
 package com.example.myplayer
 
+import SHA256Util
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
+import com.example.myplayer.model.BaseResponseJsonData
 import com.example.myplayer.model.BaseSentJsonData
+import com.example.myplayer.model.UserInfo
+import com.example.myplayer.model.playroom.Playroom
 import com.example.myplayer.network.BaseInformation
 import com.example.myplayer.network.LoginRequest
+import com.example.myplayer.network.networkAPI.GetRequest
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 
+val TAG = "LoginScreen"
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     navController: NavHostController
     ) {
-    var account by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var account by remember { mutableStateOf("1959804282@qq.com") }
+    var password by remember { mutableStateOf("123456") }
     var isRegister by remember { mutableStateOf(false) }
     var showErrorDialog by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
 
 
     if (showErrorDialog) {
@@ -40,13 +57,6 @@ fun LoginScreen(
                 }
             }
         )
-    }
-
-    Button(onClick = {
-        isRegister = true//当前状态为注册状态
-    })
-    {
-        Text("注册")
     }
 
     val coroutineScope = rememberCoroutineScope()
@@ -75,7 +85,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
@@ -84,8 +94,8 @@ fun LoginScreen(
                             val response =
                                 LoginRequest(
                                     listOf(
-                                        BaseSentJsonData("u_account", "1959804282@qq.com"),
-                                        BaseSentJsonData("u_password", "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92")
+                                        BaseSentJsonData("u_account", account),
+                                        BaseSentJsonData("u_password", SHA256Util.sha256Encrypt(password))
                                     ),
                                     "/login"
                                 ).sendRequest(coroutineScope)
@@ -94,13 +104,13 @@ fun LoginScreen(
                             // 修改后登录逻辑：
                             if (data.data != null) {
                                 onLoginSuccess()
-                                account = "1959804282@qq.com"
-                                password = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92"
                                 BaseInformation.account = account
-                                BaseInformation.password = password
+                                BaseInformation.password = SHA256Util.sha256Encrypt(password)
                                 BaseInformation.token = data.data
-                                Log.e("loginScreen",data.toString())
-                                Log.e("loginScreen-token",BaseInformation.token)
+                                Log.i("loginScreen",data.toString())
+                                Log.i("loginScreen-token",BaseInformation.token)
+                                getUserInfo(coroutineScope)
+                                getFriendList(coroutineScope)
                             } else {
                                 showErrorDialog = true
                                 data.msg?.let { Log.e("loginScreen", it) }
@@ -114,6 +124,23 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
+            
+            // 修改后的注册按钮
+            Button(
+                onClick = { isRegister = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Transparent),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(
+                    text = "注册",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
     else
@@ -121,4 +148,64 @@ fun LoginScreen(
         navController.navigate("register")
     }
 
+}
+
+suspend fun getUserInfo(coroutineScope: CoroutineScope){
+    try {
+        val request = GetRequest(
+            interfaceName = "/user/getuserinfo",
+            queryParams = mapOf()
+        )
+        val response = request.execute(coroutineScope)
+        val gson = Gson()
+        val type = object : TypeToken<BaseResponseJsonData<UserInfo>>() {}.type
+        val data = gson.fromJson<BaseResponseJsonData<UserInfo>>(response.body?.string(), type)
+
+        if (data.data != null) {
+            Log.d("LoginScreen", "获取用户信息成功：${data.data}")
+            Log.d("LoginScreen", "u_name: ${data.data.u_name}")
+
+            userInfo.u_name = data.data.u_name
+            userInfo.u_introduction = data.data.u_introduction
+            userInfo.u_avatar = data.data.u_avatar
+            userInfo.u_id = data.data.u_id
+
+        } else {
+            Log.e("LoginScreen", "获取用户信息失败：${data.msg}")
+        }
+    } catch (e: Exception) {
+        Log.e("LoginScreen", "获取用户信息异常：${e.message}")
+        throw e
+    }
+}
+suspend fun getFriendList(coroutineScope: CoroutineScope){
+    try {
+        val response = GetRequest(
+            interfaceName = "/friend/getfriends",
+            queryParams = mapOf()
+        ).execute(coroutineScope)
+        val type = object : TypeToken<BaseResponseJsonData<List<UserInfo>>>() {}.type
+        val data = Gson().fromJson<BaseResponseJsonData<List<UserInfo>>>(response.body?.string(), type)
+
+        if (data.data != null) {
+            userInfo.friendList = data.data.also {
+                Log.d(com.example.myplayer.framework.chat.TAG, "好友列表更新：${it.size}条记录")
+            }
+            // 若需要多属性设置才使用apply：
+            /*
+            userInfo.apply {
+                friendList = data.data
+                version++
+            }
+            */
+            Log.d(com.example.myplayer.framework.chat.TAG, "好友列表详情：\n${userInfo.friendList?.joinToString("\n") {
+                "好友ID：${it.u_id} 姓名：${it.u_name} 头像：${it.u_avatar}"
+            } ?: "空列表"}")
+        } else {
+            Log.e(com.example.myplayer.framework.chat.TAG, "获取好友列表失败：${data.msg}")
+        }
+    } catch (e: Exception) {
+        Log.e(com.example.myplayer.framework.chat.TAG, "获取好友列表异常：${e.message}")
+        throw e
+    }
 }

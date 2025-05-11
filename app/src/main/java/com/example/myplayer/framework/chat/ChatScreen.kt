@@ -1,5 +1,7 @@
 package com.example.myplayer.framework.chat
 
+import android.annotation.SuppressLint
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,8 +17,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.myplayer.model.BaseResponseJsonData
+import com.example.myplayer.model.UserInfo
+import com.example.myplayer.network.networkAPI.GetRequest
+import com.example.myplayer.userInfo
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.*
 import java.util.concurrent.TimeUnit
+
+val TAG = "ChatScreen"
 
 // 在Friend数据类定义之后添加：
 private val okHttpClient by lazy {
@@ -46,26 +60,33 @@ class WebSocketManager(private val url: String) {
 }
 
 // 好友数据类
-data class Friend(
-    val id: String,
-    val name: String,
-    val avatarUrl: String = ""
-)
+// 删除原有的Friend类
+// data class Friend(
+//     val id: String,
+//     val name: String,
+//     val avatarUrl: String = ""
+// )
 
 // 界面状态管理
 enum class ChatScreenState {
     FRIEND_LIST, CHAT_DETAIL
 }
 
+@SuppressLint("CoroutineCreationDuringComposition")
 @Composable
 fun ChatScreen() {
     var currentScreen by remember { mutableStateOf(ChatScreenState.FRIEND_LIST) }
-    var selectedFriend by remember { mutableStateOf<Friend?>(null) }
-
+    var selectedFriend by remember { mutableStateOf<UserInfo?>(null) } // 修改类型
+    val coroutineScope = rememberCoroutineScope()
+    coroutineScope.launch {
+        withContext(Dispatchers.IO){
+            getFriendList(coroutineScope)
+        }
+    }
     when (currentScreen) {
         ChatScreenState.FRIEND_LIST -> {
             FriendListView(
-                friends = remember { generateSampleFriends() },
+                friends = userInfo.friendList, // 使用真实数据
                 onFriendClick = { friend ->
                     selectedFriend = friend
                     currentScreen = ChatScreenState.CHAT_DETAIL
@@ -91,7 +112,7 @@ data class ChatMessage(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatDetailScreen(
-    friend: Friend?,
+    friend: UserInfo?,
     onBack: () -> Unit
 ) {
     var message by remember { mutableStateOf("") }
@@ -118,7 +139,7 @@ private fun ChatDetailScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(friend?.name ?: "聊天") },
+                title = { Text(friend?.u_name ?: "聊天") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "返回")
@@ -222,8 +243,8 @@ private fun ChatBubble(
 
 @Composable
 private fun FriendListView(
-    friends: List<Friend>,
-    onFriendClick: (Friend) -> Unit
+    friends: List<UserInfo>, // 修改参数类型
+    onFriendClick: (UserInfo) -> Unit // 修改参数类型
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(friends) { friend ->
@@ -233,7 +254,7 @@ private fun FriendListView(
 }
 
 @Composable
-private fun FriendListItem(friend: Friend, onClick: () -> Unit) {
+private fun FriendListItem(friend: UserInfo, onClick: () -> Unit) { // 修改参数类型
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -241,40 +262,49 @@ private fun FriendListItem(friend: Friend, onClick: () -> Unit) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 头像占位（实际项目应使用Coil/Glide加载图片）
         Box(
             modifier = Modifier
                 .size(48.dp)
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
         )
         Spacer(Modifier.width(16.dp))
-        Text(text = friend.name, style = MaterialTheme.typography.bodyLarge)
+        Text(text = friend.u_name, style = MaterialTheme.typography.bodyLarge) // 使用u_name
     }
 }
 
-// 生成示例好友数据
-private fun generateSampleFriends(): List<Friend> {
-    return listOf(
-        Friend("1", "张三"),
-        Friend("2", "李四"),
-        Friend("3", "王五"),
-        Friend("4", "赵六"),
-        Friend("5", "陈七"),
-        Friend("6", "林八"),
-        Friend("7", "周九"),
-        Friend("8", "吴十"),
-        Friend("9", "黄十一"),
-        Friend("10", "郑十二"),
-        // 新增以下好友
-        Friend("11", "孙十三"),
-        Friend("12", "朱十四"),
-        Friend("13", "马十五"),
-        Friend("14", "胡十六"),
-        Friend("15", "郭十七"),
-        Friend("16", "何十八"),
-        Friend("17", "高十九"),
-        Friend("18", "罗二十"),
-        Friend("19", "梁二十一"),
-        Friend("20", "宋二十二")
-    )
+// 删除原有的generateSampleFriends方法
+// private fun generateSampleFriends(): List<Friend> {
+//     return listOf(...)
+// }
+
+suspend fun getFriendList(coroutineScope: CoroutineScope){
+    try {
+        val response = GetRequest(
+            interfaceName = "/friend/getfriends",
+            queryParams = mapOf()
+        ).execute(coroutineScope)
+        val type = object : TypeToken<BaseResponseJsonData<List<UserInfo>>>() {}.type
+        val data = Gson().fromJson<BaseResponseJsonData<List<UserInfo>>>(response.body?.string(), type)
+
+        if (data.data != null) {
+            userInfo.friendList = data.data.also { 
+                Log.d(TAG, "好友列表更新：${it.size}条记录")
+            }
+            // 若需要多属性设置才使用apply：
+            /*
+            userInfo.apply {
+                friendList = data.data
+                version++
+            }
+            */
+            Log.d(TAG, "好友列表详情：\n${userInfo.friendList?.joinToString("\n") { 
+                "好友ID：${it.u_id} 姓名：${it.u_name} 头像：${it.u_avatar}"
+            } ?: "空列表"}")
+        } else {
+            Log.e(TAG, "获取好友列表失败：${data.msg}")
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "获取好友列表异常：${e.message}")
+        throw e
+    }
 }

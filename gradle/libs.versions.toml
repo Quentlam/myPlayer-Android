@@ -14,6 +14,7 @@ media3Exoplayer = "1.6.1"
 media3ExoplayerHls = "1.6.1"
 media3ExoplayerDash = "1.6.1"
 roomRuntimeAndroid = "2.7.1"
+media3UiVersion = "1.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -36,6 +37,7 @@ androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplaye
 androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3ExoplayerHls" }
 androidx-media3-exoplayer-dash = { group = "androidx.media3", name = "media3-exoplayer-dash", version.ref = "media3ExoplayerDash" }
 androidx-room-runtime-android = { group = "androidx.room", name = "room-runtime-android", version.ref = "roomRuntimeAndroid" }
+media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3UiVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

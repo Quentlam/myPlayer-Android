@@ -67,9 +67,9 @@ class BaseRequest(val jsonObjectList: List<BaseSentJsonData>, val interfaceName:
                 .addInterceptor { chain ->
                     val request = chain.request()
                     // 打印请求头
-                    Log.e("BaseRequest", "Request Headers:")
+                    Log.d("BaseRequest", "Request Headers:")
                     request.headers.forEach { (name, value) ->
-                        Log.e("BaseRequest", "$name: $value")
+                        Log.d("BaseRequest", "$name: $value")
                     }
                     chain.proceed(request)
                 }
