@@ -4,11 +4,12 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 
+
 @Entity(tableName = "playrooms")
 data class Playroom(
-    @PrimaryKey val r_id: String,
-    val r_name: String,
-    val r_avatar: String,
-    val r_introduction: String,
-    val current_url: String
+    @PrimaryKey var r_id: String,
+    var r_name: String,
+    var r_avatar: String,
+    var r_introduction: String,
+    var current_url: String
 )

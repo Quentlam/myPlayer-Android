@@ -7,7 +7,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -15,7 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.myplayer.framework.chat.ChatScreen
 import com.example.myplayer.framework.friend.FriendsScreen
 import com.example.myplayer.framework.me.SettingsScreen
-import com.example.myplayer.framework.playroom.playroomScreen
+import com.example.myplayer.framework.playroom.chosePlayroomScreen
 
 ////11
 @Composable
@@ -57,7 +56,7 @@ fun HomeScreen() {
             composable("friends")  { FriendsScreen() }
             composable("chat")     { ChatScreen() }
             composable("Me")       { SettingsScreen() }
-            composable("playroom") { playroomScreen() }
+            composable("playroom") { chosePlayroomScreen() }
         }
     }
 }

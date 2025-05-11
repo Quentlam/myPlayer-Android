@@ -41,7 +41,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -50,6 +49,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.androidx.media3.exoplayer.dash)
+    implementation(libs.androidx.room.runtime.android)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -63,8 +65,18 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.5.3")
 
 
-    val room_version = "2.6.1" // 或更新版本
+    val room_version = "2.7.1" // 或更新版本
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version") // 重要！支持协程
     kapt("androidx.room:room-compiler:$room_version")
+
+
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+
+    // ExoPlayer Core
+    implementation("androidx.media3:media3-exoplayer:1.1.0")  // 替换为最新版本号
+    // UI 组件 (如 PlayerView)
+    implementation("androidx.media3:media3-ui:1.1.0")  // 替换为最新版本号
+    // 数据源支持 (HTTP, HTTPS 等)
+    implementation("androidx.media3:media3-datasource:1.1.0") // 替换为最新版本号
 }

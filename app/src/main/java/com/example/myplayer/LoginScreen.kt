@@ -1,5 +1,6 @@
 package com.example.myplayer
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -10,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
 import com.example.myplayer.model.BaseSentJsonData
+import com.example.myplayer.network.BaseInformation
 import com.example.myplayer.network.LoginRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,7 +25,6 @@ fun LoginScreen(
     ) {
     var account by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var responseText by remember { mutableStateOf("") }
     var isRegister by remember { mutableStateOf(false) }
     var showErrorDialog by remember { mutableStateOf(false) }
 
@@ -78,30 +79,34 @@ fun LoginScreen(
 
             Button(
                 onClick = {
-                    onLoginSuccess()
-//                    coroutineScope.launch {
-//                        withContext(Dispatchers.IO) {
-//                            val response =
-//                                LoginRequest(
-//                                    listOf(
-//                                        BaseSentJsonData("u_account", account),
-//                                        BaseSentJsonData("u_password", password)
-//                                    ),
-//                                    "/login"
-//                                ).sendRequest(coroutineScope)
-//
-//                            val data = JsonToBaseResponse<String>(response).getResponseData()
-//                            // 在主线程中更新 UI 状态
-//                            // 修改后登录逻辑：
-//                            if (data.code == 200) {
-//                                onLoginSuccess()
-//                            } else {
-//                                onLoginSuccess()
-//                                //showErrorDialog = true
-//                                //responseText = "登录失败：${data.code}"
-//                            }
-//                        }
-//                    }
+                    coroutineScope.launch {
+                        withContext(Dispatchers.IO) {
+                            val response =
+                                LoginRequest(
+                                    listOf(
+                                        BaseSentJsonData("u_account", "1959804282@qq.com"),
+                                        BaseSentJsonData("u_password", "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92")
+                                    ),
+                                    "/login"
+                                ).sendRequest(coroutineScope)
+                            val data = JsonToBaseResponse<String>(response).getResponseData()
+                            // 在主线程中更新 UI 状态
+                            // 修改后登录逻辑：
+                            if (data.data != null) {
+                                onLoginSuccess()
+                                account = "1959804282@qq.com"
+                                password = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92"
+                                BaseInformation.account = account
+                                BaseInformation.password = password
+                                BaseInformation.token = data.data
+                                Log.e("loginScreen",data.toString())
+                                Log.e("loginScreen-token",BaseInformation.token)
+                            } else {
+                                showErrorDialog = true
+                                data.msg?.let { Log.e("loginScreen", it) }
+                            }
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -109,7 +114,6 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            Text(responseText)
         }
     }
     else
