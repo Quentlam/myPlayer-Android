@@ -191,13 +191,6 @@ suspend fun getFriendList(coroutineScope: CoroutineScope){
             userInfo.friendList = data.data.also {
                 Log.d(com.example.myplayer.framework.chat.TAG, "好友列表更新：${it.size}条记录")
             }
-            // 若需要多属性设置才使用apply：
-            /*
-            userInfo.apply {
-                friendList = data.data
-                version++
-            }
-            */
             Log.d(com.example.myplayer.framework.chat.TAG, "好友列表详情：\n${userInfo.friendList?.joinToString("\n") {
                 "好友ID：${it.u_id} 姓名：${it.u_name} 头像：${it.u_avatar}"
             } ?: "空列表"}")

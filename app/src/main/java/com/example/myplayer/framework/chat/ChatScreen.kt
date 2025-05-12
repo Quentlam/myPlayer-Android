@@ -17,8 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.myplayer.WebSocketManager
 import com.example.myplayer.model.BaseResponseJsonData
 import com.example.myplayer.model.UserInfo
+import com.example.myplayer.model.WebSocketResponse
 import com.example.myplayer.network.networkAPI.GetRequest
 import com.example.myplayer.userInfo
 import com.google.gson.Gson
@@ -31,41 +33,6 @@ import okhttp3.*
 import java.util.concurrent.TimeUnit
 
 val TAG = "ChatScreen"
-
-// 在Friend数据类定义之后添加：
-private val okHttpClient by lazy {
-    OkHttpClient.Builder()
-        .readTimeout(3, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .build()
-}
-
-class WebSocketManager(private val url: String) {
-    private var webSocket: WebSocket? = null
-
-    fun connect(listener: WebSocketListener) {
-        val request = Request.Builder()
-            .url(url)
-            .build()
-        webSocket = okHttpClient.newWebSocket(request, listener)
-    }
-
-    fun sendMessage(message: String) {
-        webSocket?.send(message)
-    }
-
-    fun disconnect() {
-        webSocket?.close(1000, "Normal closure")
-    }
-}
-
-// 好友数据类
-// 删除原有的Friend类
-// data class Friend(
-//     val id: String,
-//     val name: String,
-//     val avatarUrl: String = ""
-// )
 
 // 界面状态管理
 enum class ChatScreenState {
@@ -83,6 +50,7 @@ fun ChatScreen() {
             getFriendList(coroutineScope)
         }
     }
+
     when (currentScreen) {
         ChatScreenState.FRIEND_LIST -> {
             FriendListView(
@@ -118,22 +86,39 @@ private fun ChatDetailScreen(
     var message by remember { mutableStateOf("") }
     var chatMessages by remember {
         mutableStateOf(
-            mutableListOf(
-                ChatMessage("你好", isMyMessage = true),
-                ChatMessage("你好", isMyMessage = false),
-                ChatMessage("最近怎么样？", isMyMessage = true),
-                ChatMessage("我挺好的，谢谢关心。", isMyMessage = false),
-                ChatMessage("你呢？", isMyMessage = false),
-                ChatMessage("我过的很开心，希望我们一直开心。", isMyMessage = true)
-            )
+            mutableListOf<ChatMessage>()
         )
     }
+
+    val webSocketManager = WebSocketManager("wss://www.myplayer.merlin.xin/online?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}")
+    val listener = object : WebSocketListener() {
+        override fun onMessage(webSocket: WebSocket, text: String) {
+
+            val type = object : TypeToken<WebSocketResponse>() {}.type
+            val data = Gson().fromJson<WebSocketResponse>(text, type)
+
+            if(data.sender == friend?.u_id){ //如果发送者是选择的好友
+                chatMessages = chatMessages.toMutableList().apply {
+                    add(ChatMessage(data.content, false))
+                }
+            }
+            else if(data.sender == userInfo?.u_id){
+                chatMessages = chatMessages.toMutableList().apply {
+                    add(ChatMessage(data.content, true))
+                }
+            }
+            Log.d(TAG, data.toString())
+        }
+    }
+    webSocketManager.connect(listener)
 
     val listState = rememberLazyListState()
 
     // 将 LaunchedEffect 移到 @Composable 函数的顶层
     LaunchedEffect(chatMessages) {
-        listState.animateScrollToItem(chatMessages.size - 1)
+        if(chatMessages.size - 1 > 0){
+            listState.animateScrollToItem(chatMessages.size - 1)
+        }
     }
 
     Scaffold(
@@ -168,6 +153,7 @@ private fun ChatDetailScreen(
                             chatMessages = chatMessages.toMutableList().apply {
                                 add(ChatMessage(message, isMyMessage = true))
                             }
+                            webSocketManager.sendMessage(message)
                             message = ""
                             // 这里可以添加发送消息到 WebSocket 的逻辑
                         }
