@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,23 +15,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
 import com.example.myplayer.model.BaseResponseJsonData
 import com.example.myplayer.model.BaseSentJsonData
+import com.example.myplayer.model.playroom.PlayroomContent
 import com.example.myplayer.model.playroom.RequestDetails
 import com.example.myplayer.network.BaseInformation.currentMemberList
 import com.example.myplayer.network.BaseInformation.currentRequestList
 import com.example.myplayer.network.BaseInformation.currentRoom
 import com.example.myplayer.network.BaseRequest
-import com.example.myplayer.network.LoginRequest
 import com.example.myplayer.userInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Response
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import androidx.compose.material3.MaterialTheme
+import com.example.myplayer.model.playroom.Member
 
 
 @Composable
@@ -168,14 +177,30 @@ fun roomScreen(
     navController: NavController,
 ) {
     Log.d("chosePlayroomScreen","现在的房间ID：${currentRoom.r_id},视频连接：${currentRoom.current_url}")
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var currentTab by remember { mutableStateOf(0) }
+    var messageInput by remember { mutableStateOf("") }
+    val messageList by getPlayroomMessage(context, currentRoom.r_id)
+        .collectAsStateWithLifecycle(initialValue = emptyList())//直接获取Flow并且转换为Status
+
+    // 添加 LazyListState 来控制滚动
+    val listState = rememberLazyListState()
+
+    // 当消息列表更新时，自动滚动到底部
+    LaunchedEffect(messageList.size) {
+        if (messageList.isNotEmpty()) {
+            listState.animateScrollToItem(messageList.size - 1)
+        }
+    }
+
+
     getMembers(currentRoom.r_id)
     getInvitations(currentRoom.r_id)
 
-    var currentTab by remember { mutableStateOf(0) }
-    var messageInput by remember { mutableStateOf("") }
-    val danmuList = remember { mutableStateListOf<String>() }
-    Scaffold(
 
+
+    Scaffold(
     ) { padding ->
         Column(
             modifier = Modifier
@@ -224,15 +249,16 @@ fun roomScreen(
                 // 列表内容区域
                 Box(modifier = Modifier.weight(1f)) {
                     when (currentTab) {
-                        0 -> LazyColumn {
-                            items(danmuList.size) { index ->
-                                Text(danmuList[index], modifier = Modifier.padding(8.dp))
+                        0 -> LazyColumn(
+                            state = listState
+                        ){
+                            items(messageList) { message ->
+                                messageElment(message)
                             }
                         }
-
                         1 -> LazyColumn {
-                            items(currentMemberList.size) { member ->
-                                Text(currentMemberList[member].m_name, modifier = Modifier.padding(8.dp))
+                            items(currentMemberList) { member ->
+                                memberElement(member)
                             }
                         }
                     }
@@ -255,8 +281,20 @@ fun roomScreen(
                 Button(
                     onClick = {
                         if (messageInput.isNotBlank()) {
-                            danmuList.add(messageInput)
-                            messageInput = ""
+                            //messageList.add(messageInput)
+                            scope.launch {//保存弹幕信息
+                                messageInput = savePlayroomMessage(
+                                    context,
+                                    PlayroomContent(
+                                        0,
+                                        currentRoom.r_id,
+                                        userInfo.u_id,
+                                        userInfo.u_name,
+                                        messageInput,
+                                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                                    )
+                                )
+                            }
                         }
                     },
                     modifier = Modifier.padding(start = 8.dp)
@@ -327,3 +365,99 @@ fun RequestItem(
     }
 }
 
+@Composable
+fun messageElment(message : PlayroomContent)
+{
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .background(
+                    color = if (message.u_id == userInfo.u_id)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(8.dp)
+                // 修正：使用 alignBy 而不是 align
+                .align(if (message.u_id == userInfo.u_id) Alignment.CenterEnd else Alignment.CenterStart)
+                .widthIn(max = 280.dp)
+        ) {
+            Text(
+                text = if (message.u_id == userInfo.u_id) "你" else message.u_name,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (message.u_id == userInfo.u_id)
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = message.content,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (message.u_id == userInfo.u_id)
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Text(
+                text = message.time,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (message.u_id == userInfo.u_id)
+                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .align(Alignment.End)  // 这里的 align 是在 Column 中使用，所以保持不变
+            )
+        }
+    }
+}
+
+@Composable
+fun memberElement(member : Member) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // 用户头像
+            AsyncImage(
+                model = member.m_avatar,
+                contentDescription = "用户头像",
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = CircleShape
+                    )
+            )
+
+            Column {
+                // 用户名
+                Text(
+                    text = member.m_name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                // 用户ID
+                Text(
+                    text = "ID: ${member.m_id}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
