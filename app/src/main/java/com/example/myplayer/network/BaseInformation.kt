@@ -2,11 +2,9 @@ package com.example.myplayer.network
 
 import com.example.myplayer.framework.Dao.PlayroomDatabase
 import android.content.Context
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.room.Room
+import com.example.myplayer.model.playroom.RequestDetails
+import com.example.myplayer.model.playroom.Member
 import com.example.myplayer.model.playroom.Playroom
 
 
@@ -17,6 +15,7 @@ object BaseInformation {
     var account = ""
     var password = ""
     var token = ""
+    var roomList = emptyList<Playroom>()
     var currentRoom  = Playroom(
         r_id = "0000000",
         r_name = "默认播放室",
@@ -24,6 +23,9 @@ object BaseInformation {
         r_introduction = "默认播放室",
         current_url = "none"
     ) //创建一个默认的播放室
+    var testUrl = "http://10.61.164.47:9990/test.mp4"
+    var currentMemberList = emptyList<Member>()
+    var currentRequestList = emptyList<RequestDetails>()
 
 }
 
