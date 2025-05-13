@@ -41,7 +41,9 @@ object DatabaseProvider {
                 context.applicationContext,
                 PlayroomDatabase::class.java,
                 "playroom_database"
-            ).build()
+            )
+                .fallbackToDestructiveMigration(true)
+                .build()
             INSTANCE = instance
             instance
         }

@@ -2,13 +2,19 @@ package com.example.myplayer.framework.Dao
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import com.example.myplayer.model.playroom.Playroom
-import com.example.myplayer.framework.Dao.PlayroomDao
+
+
 @Database(
-    entities = [com.example.myplayer.model.playroom.Playroom::class],
-    version = 1,
+    entities = [
+        com.example.myplayer.model.playroom.Playroom::class,
+        com.example.myplayer.model.playroom.PlayroomContent::class
+               ],
+    version = 3,
     exportSchema = false
 )
 abstract class PlayroomDatabase : RoomDatabase() {
     abstract fun playroomDao(): PlayroomDao
+    abstract fun playroomContentDao(): PlayroomContentDao
 }
+
+
