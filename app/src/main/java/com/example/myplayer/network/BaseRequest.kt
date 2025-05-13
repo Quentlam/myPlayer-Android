@@ -4,8 +4,6 @@ import android.util.Log
 import com.example.myplayer.model.BaseSentJsonData
 import com.example.myplayer.network.interceptor.TokenRefreshInterceptor
 import kotlinx.coroutines.CoroutineScope
-import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request

@@ -2,6 +2,7 @@ package com.example.myplayer.framework.chat
 
 import android.annotation.SuppressLint
 import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,11 +17,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.example.myplayer.WebSocketManager
 import com.example.myplayer.model.BaseResponseJsonData
 import com.example.myplayer.model.UserInfo
-import com.example.myplayer.model.WebSocketResponse
 import com.example.myplayer.network.networkAPI.GetRequest
 import com.example.myplayer.userInfo
 import com.google.gson.Gson
@@ -29,8 +29,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.*
-import java.util.concurrent.TimeUnit
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.rememberImagePainter
+import com.example.myplayer.webSocketManager
+import org.json.JSONObject
 
 val TAG = "ChatScreen"
 
@@ -38,6 +42,9 @@ val TAG = "ChatScreen"
 enum class ChatScreenState {
     FRIEND_LIST, CHAT_DETAIL
 }
+
+// 使用可观察的StateList
+val chatMessagesMap = mutableStateMapOf<String, SnapshotStateList<ChatMessage>>()
 
 @SuppressLint("CoroutineCreationDuringComposition")
 @Composable
@@ -64,7 +71,29 @@ fun ChatScreen() {
         ChatScreenState.CHAT_DETAIL -> {
             ChatDetailScreen(
                 friend = selectedFriend,
-                onBack = { currentScreen = ChatScreenState.FRIEND_LIST }
+                onBack = { currentScreen = ChatScreenState.FRIEND_LIST },
+                onMessageSent = { it ->
+                   val wsComStr = JSONObject().apply {
+                       put("system", false)
+                       put("group", false)
+                       put("message", true)
+                       put("sender", userInfo.u_id) // 发送者ID
+                       put("sender_name", userInfo.u_name) // 发送者姓名
+                       put("target", selectedFriend?.u_id) // 接收者ID
+                       put("content", it)
+                       put("time", "2025/5/13 00:00:00") // 时间戳
+                   }.toString()
+                   webSocketManager?.sendMessage(wsComStr)
+
+                    // 新增消息到本地聊天记录
+                    selectedFriend?.u_id?.let { friendId ->
+                        val messages = chatMessagesMap.getOrPut(friendId) { mutableStateListOf() }
+                        messages.add(ChatMessage(
+                            content = it,
+                            isMyMessage = true
+                        ))
+                    }
+                }
             )
         }
     }
@@ -73,45 +102,19 @@ fun ChatScreen() {
 // 新增数据类，用于存储聊天消息和时间
 data class ChatMessage(
     val content: String,
-    val isMyMessage: Boolean,
-    val timestamp: Long = System.currentTimeMillis()
+    val isMyMessage: Boolean
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatDetailScreen(
     friend: UserInfo?,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onMessageSent: (String) -> Unit  // 新增回调
 ) {
     var message by remember { mutableStateOf("") }
-    var chatMessages by remember {
-        mutableStateOf(
-            mutableListOf<ChatMessage>()
-        )
-    }
-
-    val webSocketManager = WebSocketManager("wss://www.myplayer.merlin.xin/online?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}")
-    val listener = object : WebSocketListener() {
-        override fun onMessage(webSocket: WebSocket, text: String) {
-
-            val type = object : TypeToken<WebSocketResponse>() {}.type
-            val data = Gson().fromJson<WebSocketResponse>(text, type)
-
-            if(data.sender == friend?.u_id){ //如果发送者是选择的好友
-                chatMessages = chatMessages.toMutableList().apply {
-                    add(ChatMessage(data.content, false))
-                }
-            }
-            else if(data.sender == userInfo?.u_id){
-                chatMessages = chatMessages.toMutableList().apply {
-                    add(ChatMessage(data.content, true))
-                }
-            }
-            Log.d(TAG, data.toString())
-        }
-    }
-    webSocketManager.connect(listener)
-
+    var chatMessages = chatMessagesMap[friend?.u_id]?: mutableListOf()
+    Log.d(TAG, chatMessages.toString())
     val listState = rememberLazyListState()
 
     // 将 LaunchedEffect 移到 @Composable 函数的顶层
@@ -150,12 +153,8 @@ private fun ChatDetailScreen(
                 Button(
                     onClick = {
                         if (message.isNotBlank()) {
-                            chatMessages = chatMessages.toMutableList().apply {
-                                add(ChatMessage(message, isMyMessage = true))
-                            }
-                            webSocketManager.sendMessage(message)
+                            onMessageSent(message)  // 改用回调处理
                             message = ""
-                            // 这里可以添加发送消息到 WebSocket 的逻辑
                         }
                     }
                 ) {
@@ -174,12 +173,10 @@ private fun ChatDetailScreen(
                 reverseLayout = false,
                 state = listState
             ) {
-                val sortedMessages = chatMessages.sortedBy { it.timestamp }
-                items(sortedMessages) { msg ->
+                items(chatMessages) { msg ->
                     ChatBubble(
                         message = msg.content,
-                        isMyMessage = msg.isMyMessage,
-                        timestamp = msg.timestamp
+                        isMyMessage = msg.isMyMessage
                     )
                 }
             }
@@ -190,11 +187,8 @@ private fun ChatDetailScreen(
 @Composable
 private fun ChatBubble(
     message: String,
-    isMyMessage: Boolean,
-    timestamp: Long
+    isMyMessage: Boolean
 ) {
-    // 转换时间戳为可读格式，这里简单示例，实际可根据需求调整
-    val timeText = java.text.SimpleDateFormat("HH:mm").format(java.util.Date(timestamp))
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -218,12 +212,6 @@ private fun ChatBubble(
                 color = if (isMyMessage) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
             )
         }
-        Text(
-            text = timeText,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.padding(top = 4.dp)
-        )
     }
 }
 
@@ -240,7 +228,7 @@ private fun FriendListView(
 }
 
 @Composable
-private fun FriendListItem(friend: UserInfo, onClick: () -> Unit) { // 修改参数类型
+private fun FriendListItem(friend: UserInfo, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -248,20 +236,23 @@ private fun FriendListItem(friend: UserInfo, onClick: () -> Unit) { // 修改参
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
+        Image(
+            painter = rememberImagePainter(
+                data = friend.u_avatar,
+                builder = {
+                    crossfade(true)
+                }
+            ),
+            contentDescription = "用户头像",
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(48.dp)
-                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                .clip(CircleShape)
         )
         Spacer(Modifier.width(16.dp))
-        Text(text = friend.u_name, style = MaterialTheme.typography.bodyLarge) // 使用u_name
+        Text(text = friend.u_name, style = MaterialTheme.typography.bodyLarge)
     }
 }
-
-// 删除原有的generateSampleFriends方法
-// private fun generateSampleFriends(): List<Friend> {
-//     return listOf(...)
-// }
 
 suspend fun getFriendList(coroutineScope: CoroutineScope){
     try {
@@ -276,13 +267,6 @@ suspend fun getFriendList(coroutineScope: CoroutineScope){
             userInfo.friendList = data.data.also { 
                 Log.d(TAG, "好友列表更新：${it.size}条记录")
             }
-            // 若需要多属性设置才使用apply：
-            /*
-            userInfo.apply {
-                friendList = data.data
-                version++
-            }
-            */
             Log.d(TAG, "好友列表详情：\n${userInfo.friendList?.joinToString("\n") { 
                 "好友ID：${it.u_id} 姓名：${it.u_name} 头像：${it.u_avatar}"
             } ?: "空列表"}")

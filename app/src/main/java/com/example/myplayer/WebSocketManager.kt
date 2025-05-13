@@ -5,6 +5,9 @@ import okhttp3.Request
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
+import android.util.Log
+
+private val TAG = "WebSocketManager"
 
 // 在Friend数据类定义之后添加：
 private val okHttpClient by lazy {
@@ -29,6 +32,7 @@ class WebSocketManager(private val url: String) {
     }
 
     fun disconnect() {
-        webSocket?.close(1000, "Normal closure")
+
+        Log.i(TAG, "退出登录${webSocket?.close(1000, "Normal closure")}")
     }
 }

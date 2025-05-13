@@ -31,8 +31,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import com.example.myplayer.framework.chat.ChatMessage
+import com.example.myplayer.framework.chat.chatMessagesMap
+import com.example.myplayer.model.WebSocketResponse
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 
-val TAG = "LoginScreen"
+private val TAG = "LoginScreen"
 
 @Composable
 fun LoginScreen(
@@ -44,7 +49,6 @@ fun LoginScreen(
     var isRegister by remember { mutableStateOf(false) }
     var showErrorDialog by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
-
 
     if (showErrorDialog) {
         AlertDialog(
@@ -109,11 +113,13 @@ fun LoginScreen(
                                 BaseInformation.token = data.data
                                 Log.i("loginScreen",data.toString())
                                 Log.i("loginScreen-token",BaseInformation.token)
+
                                 getUserInfo(coroutineScope)
                                 getFriendList(coroutineScope)
+                                connectToWS()
                             } else {
                                 showErrorDialog = true
-                                data.msg?.let { Log.e("loginScreen", it) }
+                                data.msg?.let { Log.e(TAG, it) }
                             }
                         }
                     }
@@ -124,8 +130,7 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            
-            // 修改后的注册按钮
+
             Button(
                 onClick = { isRegister = true },
                 modifier = Modifier
@@ -201,4 +206,24 @@ suspend fun getFriendList(coroutineScope: CoroutineScope){
         Log.e(com.example.myplayer.framework.chat.TAG, "获取好友列表异常：${e.message}")
         throw e
     }
+}
+var webSocketManager: WebSocketManager? = null;
+    suspend fun connectToWS(){
+    webSocketManager = WebSocketManager("wss://www.myplayer.merlin.xin/online?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}")
+    val listener = object : WebSocketListener() {
+        override fun onMessage(webSocket: WebSocket, text: String) {
+            val type = object : TypeToken<WebSocketResponse>() {}.type
+            val data = Gson().fromJson<WebSocketResponse>(text, type)
+            // 确保每个发送者有对应的消息列表
+            val messages = chatMessagesMap.getOrPut(data.sender) { mutableStateListOf() }
+            // 添加新消息（需在UI线程更新）
+            messages.add(ChatMessage(
+                content = data.content, 
+                isMyMessage = data.sender == userInfo.u_id // 根据发送者判断是否是自己的消息
+            ))
+            Log.i(TAG, "收到来自${data.sender_name}的消息: ${data.content}")
+            Log.d(TAG, data.toString())
+        }
+    }
+    webSocketManager?.connect(listener)
 }
