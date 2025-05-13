@@ -45,16 +45,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.myplayer.model.BaseResponseJsonData
+import com.example.myplayer.network.BaseInformation.currentMemberList
 import com.example.myplayer.network.BaseInformation.currentRoom
-import com.example.myplayer.network.networkAPI.GetRequest
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -68,195 +61,30 @@ fun chosePlayroomScreen() {
     ) {
         composable("playroomList") {
             Column {
-                PlayroomListItem(localNavController)
+                setPlayroomList(localNavController)
             }
         }
         composable("room/{roomId}") {
             backStackEntry ->
             roomScreen(
-                roomId = backStackEntry.arguments?.getString("roomId") ?: "0000000",
-                videoUrl = currentRoom.current_url
+                localNavController
+            )
+        }
+        composable("manageRoom/{roomId}") {
+                backStackEntry ->
+            manageRoomScreen(
+                onBack = { localNavController.popBackStack() } ,
+                onAvatarUpdate =
+                {
+                   //更新头像之后的逻辑
+                }
             )
         }
     }
 }
 
 @Composable
-private fun PlayroomListItem(
-    localNavController : NavHostController
-)
-{
-    val scope = rememberCoroutineScope()
-    var showManageDialog by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-
-    // 修改状态声明
-    var isLoading by remember { mutableStateOf(true) }
-    var playrooms by remember { mutableStateOf<List<Playroom>>(emptyList()) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    // 使用 collectAsState 来收集 Flow
-    LaunchedEffect(Unit) {
-        try {
-            withContext(Dispatchers.IO) {
-                getAllPlayrooms(scope)
-                    .collect { rooms ->
-                        withContext(Dispatchers.Main) {
-                            playrooms = rooms ?: emptyList()
-                            isLoading = false
-                        }
-                    }
-            }
-        } catch (e: Exception) {
-            withContext(Dispatchers.Main) {
-                error = e.message
-                isLoading = false
-                Log.e("Playrooms", "Error loading playrooms: ${e.message}")
-            }
-        }
-    }
-
-    Scaffold(
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { /* 创建新播放室逻辑 */ },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("新建播放室") }
-            )
-        },
-        topBar = {
-            CustomTopAppBar(
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                onAddClick = { /* 创建新播放室逻辑 */ }
-            )
-        }
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
-            if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else if (error != null) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("加载失败: $error", color = Color.Red)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = {
-                            error = null
-                            isLoading = true
-                            scope.launch {
-                                try {
-                                    withContext(Dispatchers.IO) {
-                                        getAllPlayrooms(scope)
-                                            .collect { rooms ->
-                                                withContext(Dispatchers.Main) {
-                                                    playrooms = rooms ?: emptyList()
-                                                    isLoading = false
-                                                }
-                                            }
-                                    }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        error = e.message
-                                        isLoading = false
-                                    }
-                                }
-                            }
-                        }) {
-                            Text("重试")
-                        }
-                    }
-                }
-            } else if (playrooms.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("暂无播放室")
-                }
-            } else {
-                LazyColumn {
-                    items(playrooms) { room ->
-                        room.current_url = "http://10.61.164.47:9990/test.mp4"
-
-                        PlayroomItem(
-                            room = room,
-                            onJoin = {
-                                currentRoom = room
-                                showManageDialog = true
-                                localNavController.navigate("room/${room.r_id}?videoUrl=${room.current_url}")
-                            },
-                            onManage = {}
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-suspend fun getAllPlayrooms(coroutineScope: CoroutineScope): Flow<List<Playroom>> = flow {
-    try {
-        val request = GetRequest(
-            interfaceName = "/room/getrooms",
-            queryParams = mapOf()
-        )
-        val response = request.execute(coroutineScope)
-        val gson = Gson()
-        val type = object : TypeToken<BaseResponseJsonData<List<Playroom>>>() {}.type
-        val data = gson.fromJson<BaseResponseJsonData<List<Playroom>>>(response.body?.string(), type)
-
-        if (data.data != null) {
-            Log.d("Playrooms", "获取播放室列表成功：${data.data}")
-            emit(data.data)
-        } else {
-            Log.e("Playrooms", "获取播放室列表失败：${data.msg}")
-            emit(emptyList())
-        }
-    } catch (e: Exception) {
-        Log.e("Playrooms", "获取播放室列表异常：${e.message}")
-        throw e
-    }
-}.flowOn(Dispatchers.IO)
-
-
-
-@Composable
-private fun PlayroomItem(room: Playroom, onJoin: () -> Unit, onManage: () -> Unit)
-{
-    // 使用State而不是StateList
-    var memberCount by remember { mutableStateOf(0) }
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-    ) {
-        // 在PlayroomItem的onJoin回调中添加
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onManage) {
-                Icon(Icons.Default.Settings, contentDescription = "管理")
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(room.r_name, style = MaterialTheme.typography.titleMedium)
-                Text("在线人数: $memberCount", style = MaterialTheme.typography.bodySmall)
-            }
-            Button(onClick = onJoin) {
-                Text("加入")
-            }
-        }
-    }
-}
-
-
-@Composable
-fun CustomTopAppBar(
+fun customTopAppBar(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onAddClick: () -> Unit
@@ -265,7 +93,7 @@ fun CustomTopAppBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(Color(0xFFF19E9E))  // 使用固定的紫色作为背景
+            .background(Color(0xFFF19E9E))//粉色背景
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -277,7 +105,9 @@ fun CustomTopAppBar(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp)
             ) {
                 Icon(
                     Icons.Default.Search,
@@ -302,13 +132,13 @@ fun CustomTopAppBar(
         }
 
         Spacer(modifier = Modifier.width(16.dp))
+        Button(
+            onClick = {
 
-        IconButton(onClick = onAddClick) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = "添加播放室",
-                tint = Color.White
-            )
+            }
+        ) {
+            Text("搜索")
         }
+
     }
 }

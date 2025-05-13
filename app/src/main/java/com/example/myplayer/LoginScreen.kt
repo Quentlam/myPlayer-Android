@@ -95,31 +95,36 @@ fun LoginScreen(
                 onClick = {
                     coroutineScope.launch {
                         withContext(Dispatchers.IO) {
-                            val response =
-                                LoginRequest(
-                                    listOf(
-                                        BaseSentJsonData("u_account", account),
-                                        BaseSentJsonData("u_password", SHA256Util.sha256Encrypt(password))
-                                    ),
-                                    "/login"
-                                ).sendRequest(coroutineScope)
-                            val data = JsonToBaseResponse<String>(response).getResponseData()
-                            // 在主线程中更新 UI 状态
-                            // 修改后登录逻辑：
-                            if (data.data != null) {
-                                onLoginSuccess()
-                                BaseInformation.account = account
-                                BaseInformation.password = SHA256Util.sha256Encrypt(password)
-                                BaseInformation.token = data.data
-                                Log.i("loginScreen",data.toString())
-                                Log.i("loginScreen-token",BaseInformation.token)
+                            try {
+                                val response =
+                                    LoginRequest(
+                                        listOf(
+                                            BaseSentJsonData("u_account", account),
+                                            BaseSentJsonData(
+                                                "u_password",
+                                                SHA256Util.sha256Encrypt(password)
+                                            )
+                                        ),
+                                        "/login"
+                                    ).sendRequest(coroutineScope)
+                                val data = JsonToBaseResponse<String>(response).getResponseData()
+                                // 在主线程中更新 UI 状态
+                                // 修改后登录逻辑：
+                                    onLoginSuccess()
+                                    BaseInformation.account = account
+                                    BaseInformation.password = SHA256Util.sha256Encrypt(password)
+                                    BaseInformation.token = data.data.toString()
+                                    Log.i("loginScreen", data.toString())
+                                    Log.i("loginScreen-token", BaseInformation.token)
 
-                                getUserInfo(coroutineScope)
-                                getFriendList(coroutineScope)
-                                connectToWS()
-                            } else {
+                                    getUserInfo(coroutineScope)
+                                    getFriendList(coroutineScope)
+                                    connectToWS()
+                            }
+                            catch (e: Exception)
+                            {
                                 showErrorDialog = true
-                                data.msg?.let { Log.e(TAG, it) }
+                                Log.d("loginScreen", e.toString())
                             }
                         }
                     }
