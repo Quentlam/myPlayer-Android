@@ -2,7 +2,9 @@ package com.example.myplayer.framework.me
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -73,9 +75,16 @@ fun SettingScreen() {
     ) { uri: Uri? ->
         uri?.let {
             avatarUri = it
-            Toast.makeText(context, "头像修改成功", Toast.LENGTH_SHORT).show()
+            val filePath = getRealPathFromUri(context, it)
+            filePath?.let { path ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    updateAvatarUri(this, path)
+                }
+                userInfo.u_avatar = path
+            }
         }
     }
+
 
     // 显示Toast的函数
     fun showToastMessage(message: String) {
@@ -363,11 +372,10 @@ suspend fun updatesignature(coroutineScope: CoroutineScope, newValuesignature: S
     userInfo.u_introduction = newValuesignature
 }
 
-suspend fun updateavatarUri(coroutineScope: CoroutineScope, newValueavatarUri: String) {
+suspend fun updateAvatarUri(coroutineScope: CoroutineScope, filePath: String) {
     try {
-        val file = File(newValueavatarUri)
+        val file = File(filePath)
         val requestBody = file.asRequestBody("image/*".toMediaTypeOrNull())
-
         val multipartBody = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("pic", file.name, requestBody)
@@ -379,10 +387,21 @@ suspend fun updateavatarUri(coroutineScope: CoroutineScope, newValueavatarUri: S
             .build()
 
         val client = BaseRequest.getOkHttpClient(coroutineScope)
-        val response = client.newCall(request).execute()
+        client.newCall(request).execute()
     } catch (e: Exception) {
-        // 可保留空catch或日志处理
+        // 忽略异常
     }
+    userInfo.u_avatar = filePath
+}
 
-    userInfo.u_avatar = newValueavatarUri
+
+fun getRealPathFromUri(context: Context, uri: Uri): String? {
+    val cursor = context.contentResolver.query(uri, null, null, null, null)
+    return cursor?.use {
+        val index = it.getColumnIndex(MediaStore.Images.Media.DATA)
+        it.moveToFirst()
+        it.getString(index)
+    } ?: run {
+        if (uri.scheme == "file") uri.path else null
+    }
 }
