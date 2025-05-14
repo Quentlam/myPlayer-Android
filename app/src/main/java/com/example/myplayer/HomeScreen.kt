@@ -13,7 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.myplayer.framework.chat.ChatScreen
 import com.example.myplayer.framework.friend.FriendsScreen
-import com.example.myplayer.framework.me.SettingsScreen
+import com.example.myplayer.framework.me.SettingScreen
 import com.example.myplayer.framework.playroom.chosePlayroomScreen
 
 ////11
@@ -55,7 +55,7 @@ fun HomeScreen() {
         ) {
             composable("friends")  { FriendsScreen() }
             composable("chat")     { ChatScreen() }
-            composable("Me")       { SettingsScreen() }
+            composable("Me")       { SettingScreen() }
             composable("playroom") { chosePlayroomScreen() }
         }
     }
