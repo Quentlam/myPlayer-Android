@@ -75,6 +75,3 @@ class BaseRequest(val jsonObjectList: List<BaseSentJsonData>, val interfaceName:
         }
     }
 }
-
-
-
