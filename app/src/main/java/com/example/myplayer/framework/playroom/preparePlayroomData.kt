@@ -47,15 +47,13 @@ import com.example.myplayer.model.playroom.RequestDetails
 import com.example.myplayer.model.playroom.Member
 import com.example.myplayer.model.playroom.Playroom
 import com.example.myplayer.model.playroom.PlayroomContent
-import com.example.myplayer.network.BaseInformation
 import com.example.myplayer.network.BaseInformation.currentMemberList
 import com.example.myplayer.network.BaseInformation.currentRequestList
 import com.example.myplayer.network.BaseInformation.currentRoom
 import com.example.myplayer.network.BaseInformation.roomList
-import com.example.myplayer.network.BaseInformation.testUrl
+import com.example.myplayer.network.BaseInformation.testUrl2
 import com.example.myplayer.network.BaseRequest
 import com.example.myplayer.network.DatabaseProvider
-import com.example.myplayer.network.LoginRequest
 import com.example.myplayer.network.networkAPI.GetRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -294,7 +292,7 @@ fun playroomListScreen(
             } else {
                 LazyColumn {
                     items(roomList) { room ->
-                        room.current_url = testUrl//用于测试
+                        room.current_url = testUrl2//用于测试
                         setPlayroomItem(
                             room = room,
                             onJoin = {
@@ -340,7 +338,7 @@ private fun setPlayroomItem(room: Playroom, onJoin: () -> Unit, onManage: () -> 
 fun getPlayroomMessage(context : Context,roomId : String) : Flow<List<PlayroomContent>>
 {
     try {
-        val dao = DatabaseProvider.getDatabase(context).playroomContentDao()
+        val dao = DatabaseProvider.getPlayRoomDatabase(context).playroomContentDao()
         Log.d("saveData","获取当前房间的弹幕信息成功！${dao.getCurrentPlayroomContent(roomId)}")
         return dao.getCurrentPlayroomContent(roomId)
     }

@@ -77,10 +77,16 @@ dependencies {
 
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    // ExoPlayer Core
-    implementation("androidx.media3:media3-exoplayer:1.1.0")  // 替换为最新版本号
-    // UI 组件 (如 PlayerView)
-    implementation("androidx.media3:media3-ui:1.1.0")  // 替换为最新版本号
-    // 数据源支持 (HTTP, HTTPS 等)
-    implementation("androidx.media3:media3-datasource:1.1.0") // 替换为最新版本号
+    //播放器相关依赖
+    val media3_version = "1.6.1"
+
+    implementation("androidx.media3:media3-exoplayer:$media3_version")
+    implementation("androidx.media3:media3-extractor:$media3_version")
+    implementation("androidx.media3:media3-ui:$media3_version")
+    implementation("androidx.media3:media3-common:$media3_version")
+    implementation("androidx.media3:media3-common-ktx:$media3_version")
+    implementation("androidx.media3:media3-ui-compose:$media3_version")
+
+// 网络层（推荐 OkHttp）
+    implementation("androidx.media3:media3-datasource-okhttp:$media3_version")
 }

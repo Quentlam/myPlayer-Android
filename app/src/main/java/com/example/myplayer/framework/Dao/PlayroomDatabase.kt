@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase
         com.example.myplayer.model.playroom.Playroom::class,
         com.example.myplayer.model.playroom.PlayroomContent::class
                ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class PlayroomDatabase : RoomDatabase() {
