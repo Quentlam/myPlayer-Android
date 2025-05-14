@@ -52,16 +52,6 @@ fun chosePlayroomScreen() {
             backStackEntry ->
             roomScreen(localNavController)
         }
-        composable("manageRoom/{roomId}") {
-                backStackEntry ->
-            manageRoomScreen(
-                onBack = { localNavController.popBackStack() } ,
-                onAvatarUpdate =
-                {
-                   //更新头像之后的逻辑
-                }
-            )
-        }
     }
 }
 
