@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import com.example.myplayer.framework.chat.ChatMessage
 import com.example.myplayer.framework.chat.chatMessagesMap
 import com.example.myplayer.model.WebSocketResponse
+import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
@@ -219,15 +220,41 @@ suspend fun connectToWS(){
         override fun onMessage(webSocket: WebSocket, text: String) {
             val type = object : TypeToken<WebSocketResponse>() {}.type
             val data = Gson().fromJson<WebSocketResponse>(text, type)
-            // 确保每个发送者有对应的消息列表
-            val messages = chatMessagesMap.getOrPut(data.sender) { mutableStateListOf() }
-            // 添加新消息（需在UI线程更新）
-            messages.add(ChatMessage(
-                content = data.content, 
-                isMyMessage = data.sender == userInfo.u_id // 根据发送者判断是否是自己的消息
-            ))
-            Log.i(TAG, "收到来自${data.sender_name}的消息: ${data.content}")
+            if(data.engage){ //如果被占线
+                webSocketManager?.disconnect()
+                Log.i(TAG, "WebSocket断开连接")
+            }
+            else{
+                if(data.system){
+
+                }
+                else if(data.message){
+                    // 确保每个发送者有对应的消息列表
+                    val messages = chatMessagesMap.getOrPut(data.sender) { mutableStateListOf() }
+                    // 仅在消息内容非空时添加
+                    if (!data.content.isNullOrEmpty()) {
+                        messages.add(ChatMessage(
+                            content = data.content ?: "",
+                            isMyMessage = data.sender == userInfo.u_id
+                        ))
+                        Log.i(TAG, "收到来自${data.sender_name}的消息: ${data.content}")
+                    }
+                }
+            }
             Log.d(TAG, data.toString())
+        }
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            super.onClosed(webSocket, code, reason)
+            Log.i(TAG, "连接正常关闭 code:$code reason:$reason")
+            // 触发断开回调
+//            onDisconnect?.invoke("连接关闭: $reason")
+        }
+
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            super.onFailure(webSocket, t, response)
+            Log.e(TAG, "连接异常断开", t)
+            // 触发断开回调
+//            onDisconnect?.invoke("连接异常: ${t.message}")
         }
     }
     webSocketManager?.connect(listener)
