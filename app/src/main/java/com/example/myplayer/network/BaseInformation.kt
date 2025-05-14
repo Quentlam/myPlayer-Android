@@ -2,6 +2,9 @@ package com.example.myplayer.network
 
 import com.example.myplayer.framework.Dao.PlayroomDatabase
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.room.Room
 import com.example.myplayer.model.playroom.RequestDetails
 import com.example.myplayer.model.playroom.Member
@@ -16,17 +19,19 @@ object BaseInformation {
     var password = ""
     var token = ""
     var roomList = emptyList<Playroom>()
-    var currentRoom  = Playroom(
-        r_id = "0000000",
-        r_name = "默认播放室",
-        r_avatar = "没有成员",
-        r_introduction = "默认播放室",
-        current_url = "none"
-    ) //创建一个默认的播放室
-    var testUrl = "http://10.61.164.47:9990/test.mp4"
+    var currentRoom by mutableStateOf<Playroom>(
+        Playroom(
+            r_id = "0000000",
+            r_name = "Default Play Room",
+            r_avatar = "No profile picture",
+            r_introduction = "Default Play Room",
+            current_url = "none"
+        )
+    )
+    var testUrl2 = "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
+    var testUrl1 = "http://10.60.13.48:9990/Broken Soul Clown 3.mp4"
     var currentMemberList = emptyList<Member>()
     var currentRequestList = emptyList<RequestDetails>()
-
 }
 
 
@@ -35,7 +40,7 @@ object DatabaseProvider {
     @Volatile
     private var INSTANCE: PlayroomDatabase? = null
 
-    fun getDatabase(context: Context): PlayroomDatabase {
+    fun getPlayRoomDatabase(context: Context): PlayroomDatabase {
         return INSTANCE ?: synchronized(this) {
             val instance = Room.databaseBuilder(
                 context.applicationContext,
