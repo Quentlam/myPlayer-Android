@@ -2,7 +2,9 @@ package com.example.myplayer.framework.me
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,6 +37,7 @@ import com.example.myplayer.network.BaseInformation
 import com.example.myplayer.network.BaseRequest
 import com.example.myplayer.network.DatabaseProvider
 import com.example.myplayer.network.LoginRequest
+import com.example.myplayer.network.interceptor.TokenRefreshInterceptor
 import com.example.myplayer.userInfo
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -42,11 +45,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
+import org.json.JSONException
+import org.json.JSONObject
 import java.io.File
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
 
 @SuppressLint("ContextCastToActivity")
 @Composable
@@ -73,9 +82,17 @@ fun SettingScreen() {
     ) { uri: Uri? ->
         uri?.let {
             avatarUri = it
-            Toast.makeText(context, "头像修改成功", Toast.LENGTH_SHORT).show()
+            val filePath = getRealPathFromUri(context, it)
+            filePath?.let { path ->
+                // 假设 account 是从某个地方获取的用户 ID
+                CoroutineScope(Dispatchers.IO).launch {
+                    updateAvatarUri(this, path, account) // 传入 account 参数
+                }
+                userInfo.u_avatar = path
+            }
         }
     }
+
 
     // 显示Toast的函数
     fun showToastMessage(message: String) {
@@ -154,22 +171,31 @@ fun SettingScreen() {
     }
 
     // 修改密码对话框
+// 2. Compose 层调用：根据 showChangePasswordDialog 控制弹窗，并调用 updatePassword
+// 2. Compose 层调用：按照你修改用户名时的调用方式
+// 2. Compose 层调用：按照 ChangeTextDialog 的例子去掉 title 参数
     if (showChangePasswordDialog) {
         ChangePasswordDialog(
             onDismiss = { showChangePasswordDialog = false },
-            onConfirm = { oldPassword, newPassword ->
-                // 这里假设原密码是"123456"，实际应用中应该从数据库或服务器验证
-                if (oldPassword == "123456") {
-                    // 密码正确，修改成功
-                    showToastMessage("密码修改成功")
-                    showChangePasswordDialog = false
-                } else {
-                    // 密码错误
-                    showToastMessage("原密码错误，修改失败")
+            onConfirm = { oldPwd, newPwd ->
+                // 使用 IO 线程调用接口
+                CoroutineScope(Dispatchers.IO).launch {
+                    val result = updatePassword(this, oldPwd, newPwd)
+                    withContext(Dispatchers.Main) {
+                        if (result != null && result.first == 0) {
+                            showToastMessage("密码修改成功")
+                            showChangePasswordDialog = false
+                        } else {
+                            showToastMessage("修改失败：${result?.second ?: "网络错误"}")
+                        }
+                    }
                 }
             }
         )
     }
+
+
+
 
     // 修改用户名对话框
     if (showChangeUsernameDialog) {
@@ -363,26 +389,119 @@ suspend fun updatesignature(coroutineScope: CoroutineScope, newValuesignature: S
     userInfo.u_introduction = newValuesignature
 }
 
-suspend fun updateavatarUri(coroutineScope: CoroutineScope, newValueavatarUri: String) {
+suspend fun updateAvatarUri(coroutineScope: CoroutineScope, filePath: String, account: String) {
     try {
-        val file = File(newValueavatarUri)
+        val file = File(filePath)
         val requestBody = file.asRequestBody("image/*".toMediaTypeOrNull())
-
         val multipartBody = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
-            .addFormDataPart("pic", file.name, requestBody)
+            .addFormDataPart("file", file.name, requestBody)
+            .addFormDataPart("id", account) // 新增 id 参数
             .build()
 
         val request = Request.Builder()
-            .url(BaseInformation.HOST + "/uploadavatar")
+            .url(BaseInformation.HOST + "/avatar/upload")
             .post(multipartBody)
             .build()
 
-        val client = BaseRequest.getOkHttpClient(coroutineScope)
-        val response = client.newCall(request).execute()
-    } catch (e: Exception) {
-        // 可保留空catch或日志处理
-    }
+        // 添加一行代码打印请求的 URL
+        Log.d("UpdateAvatarRequest", "Request URL: ${request.url}")
 
-    userInfo.u_avatar = newValueavatarUri
+        val client = OkHttpClient.Builder()
+            .addInterceptor(TokenRefreshInterceptor(coroutineScope)) // 只加 token 拦截器
+            .build()
+
+        val response = client.newCall(request).execute()
+
+        if (response.isSuccessful) {
+            val responseBody = response.body?.string()
+            Log.d("UpdateAvatarResponse", "Response: $responseBody")
+
+            val jsonResponse = JSONObject(responseBody ?: "{}")
+            val code = jsonResponse.getInt("code")
+            val msg = jsonResponse.getString("msg")
+            Log.d("UpdateAvatarResponse", "Code: $code, Message: $msg")
+        } else {
+            Log.e("UpdateAvatarError", "Request failed with code: ${response.code}, body: ${response.body?.string()}")
+            Log.e("UpdateAvatarError", "Request failed with code: ${response.code}")
+        }
+    } catch (e: Exception) {
+        Log.e("UpdateAvatarError", "Exception: ${e.localizedMessage}")
+    }
+}
+
+
+fun getRealPathFromUri(context: Context, uri: Uri): String? {
+    val cursor = context.contentResolver.query(uri, null, null, null, null)
+    return cursor?.use {
+        val index = it.getColumnIndex(MediaStore.Images.Media.DATA)
+        it.moveToFirst()
+        it.getString(index)
+    } ?: run {
+        if (uri.scheme == "file") uri.path else null
+    }
+}
+
+// 1. 修改密码的网络请求函数
+// 1. 修改密码的网络请求函数
+suspend fun updatePassword(
+    coroutineScope: CoroutineScope,
+    oldPassword: String,
+    newPassword: String
+): Pair<Int, String>? {
+    return try {
+        val encryptedOld = sha256(oldPassword)
+        val encryptedNew = sha256(newPassword)
+
+        val formBody = FormBody.Builder()
+            .add("oldPassword", encryptedOld)
+            .add("password", encryptedNew)
+            .build()
+
+        val request = Request.Builder()
+            .url(BaseInformation.HOST + "/user/updatepassword")
+            .post(formBody)
+            .build()
+
+        Log.d("UpdatePasswordRequest", "Request URL: ${request.url}")
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(TokenRefreshInterceptor(coroutineScope))
+            .build()
+
+        val response = client.newCall(request).execute()
+
+        if (response.isSuccessful) {
+            val body = response.body?.string().orEmpty()
+            Log.d("UpdatePasswordResponse", "Response: $body")
+            val json = JSONObject(body)
+            val code = json.getInt("code")
+            val msg = json.getString("msg")
+            code to msg
+        } else {
+            Log.e("UpdatePasswordError", "HTTP ${response.code}: ${response.body?.string()}")
+            null
+        }
+    } catch (e: Exception) {
+        Log.e("UpdatePasswordException", "Exception: ${e.localizedMessage}")
+        null
+    }
+}
+
+fun sha256(input: String): String {
+    return try {
+        val messageDigest = MessageDigest.getInstance("SHA-256")
+        val digest = messageDigest.digest(input.toByteArray())
+        val hexString = StringBuilder()
+        for (b in digest) {
+            val hex = Integer.toHexString(0xff and b.toInt())
+            if (hex.length == 1) {
+                hexString.append('0')
+            }
+            hexString.append(hex)
+        }
+        hexString.toString()
+    } catch (e: NoSuchAlgorithmException) {
+        throw RuntimeException("SHA-256 algorithm not found", e)
+    }
 }
