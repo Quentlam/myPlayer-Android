@@ -35,6 +35,10 @@ import androidx.compose.ui.layout.ContentScale
 import coil.compose.rememberImagePainter
 import com.example.myplayer.webSocketManager
 import org.json.JSONObject
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 val TAG = "ChatScreen"
 
@@ -81,7 +85,8 @@ fun ChatScreen() {
                        put("sender_name", userInfo.u_name) // 发送者姓名
                        put("target", selectedFriend?.u_id) // 接收者ID
                        put("content", it)
-                       put("time", "2025/5/13 00:00:00") // 时间戳
+                       put("time", ZonedDateTime.now(ZoneId.of("Asia/Shanghai"))
+                               .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))) // 使用上海时区
                    }.toString()
                    webSocketManager?.sendMessage(wsComStr)
 
