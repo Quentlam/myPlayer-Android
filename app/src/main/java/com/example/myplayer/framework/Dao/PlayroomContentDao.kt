@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PlayroomContentDao {
-    @Query("SELECT * FROM playroomContent WHERE r_id = :r_id")
+    @Query("SELECT * FROM playroomContent WHERE r_id = :r_id ORDER BY time ASC")
     fun getCurrentPlayroomContent(r_id : String): Flow<List<PlayroomContent>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
