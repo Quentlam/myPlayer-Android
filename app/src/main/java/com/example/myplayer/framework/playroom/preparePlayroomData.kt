@@ -289,15 +289,17 @@ fun playroomListScreen(
             searchRoomList = searchRoomList,
             onDismiss = { showSearchRoomListDialog = false },
             onJoinRoom = { room ->
+                val request = BaseRequest(
+                    listOf(
+                        BaseSentJsonData("inviter", userInfo.u_id),
+                        BaseSentJsonData("target", userInfo.u_id),
+                        BaseSentJsonData("room", room.r_id)
+                    ),
+                    "/inviting/sendinviting"
+                )
+                val response : Response
                 try{
-                    val response = BaseRequest(
-                        listOf(
-                            BaseSentJsonData("inviter", userInfo.u_id),
-                            BaseSentJsonData("target", userInfo.u_id),
-                            BaseSentJsonData("room", room.r_id)
-                        ),
-                        "/inviting/sendinviting"
-                    ).sendPostRequest(scope)
+                    response = request.sendPostRequest(scope)
                     val data = JsonToBaseResponse<String>(response).getResponseData()
                     showManageDialog = true
                     showSearchRoomListDialog = false
