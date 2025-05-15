@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,15 +14,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -31,9 +36,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.myplayer.WebSocketManager
@@ -78,6 +86,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
@@ -232,24 +241,91 @@ suspend fun loadAllPlayroom(coroutineScope: CoroutineScope) : Boolean
 @Composable
 fun playroomListScreen(
     localNavController : NavHostController
-)
-{
+) {
     val scope = rememberCoroutineScope()
     var showManageDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    // 修改状态声明
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var searchRoomList by remember { mutableStateOf<List<Playroom>>(emptyList()) }
 
     val context = LocalContext.current
 
+    // 这是过滤后的列表状态，默认为全部
+    var filteredRoomList by remember { mutableStateOf(roomList.toList()) }
 
-    // 使用 collectAsState 来收集 Flow
     LaunchedEffect(Unit) {
-                isLoading = loadAllPlayroom(scope)
+        isLoading = loadAllPlayroom(scope)
+        // 加载后初始化过滤列表为全部
+        filteredRoomList = roomList.toList()
     }
 
     var showAddPlayroomDialog by remember { mutableStateOf(false) }
+    var showSearchRoomDialog by remember { mutableStateOf(false) }
+    var showSearchRoomListDialog by remember { mutableStateOf(false) }
+    var showInviteCodeDialog by remember { mutableStateOf(false) }
+
+
+    if (showSearchRoomDialog) {
+        SearchRoomDialog(
+            onDismiss = { showSearchRoomDialog = false },
+            onSearch = { roomName ->
+                scope.launch {
+                    try {
+                        val rooms = searchPlayroomsByName(scope, roomName, context).first() ?: emptyList()
+                        searchRoomList = rooms
+                        showSearchRoomDialog = false  // 关闭输入框
+                        showSearchRoomListDialog = true // 弹出显示结果
+                    } catch (e: Exception) {
+                        Log.e("preparePlayroomData", "搜索失败：${e.message}")
+                        // 可考虑显示错误信息
+                    }
+                }
+            }
+        )
+    }
+    if (showSearchRoomListDialog) {
+        SearchResultDialog(
+            searchRoomList = searchRoomList,
+            onDismiss = { showSearchRoomListDialog = false },
+            onJoinRoom = { room ->
+                try{
+                    val response = BaseRequest(
+                        listOf(
+                            BaseSentJsonData("inviter", userInfo.u_id),
+                            BaseSentJsonData("target", userInfo.u_id),
+                            BaseSentJsonData("room", room.r_id)
+                        ),
+                        "/inviting/sendinviting"
+                    ).sendPostRequest(scope)
+                    val data = JsonToBaseResponse<String>(response).getResponseData()
+                    showManageDialog = true
+                    showSearchRoomListDialog = false
+                    Log.d("preparePlayroomData","申请加入房间成功！：${data.msg}")
+                    Toast.makeText(context, "申请加入房间成功！", Toast.LENGTH_SHORT).show()
+                }
+                catch (e : Exception)
+                {
+                    Toast.makeText(context, "申请加入房间失败！", Toast.LENGTH_SHORT).show()
+                    Log.e("preparePlayroomData","申请加入房间失败！：${e.message}")
+                }
+            }
+        )
+    }
+
+
+    // 邀请码弹窗
+    if (showInviteCodeDialog) {
+        InviteCodeDialog(
+            onDismiss = { showInviteCodeDialog = false },
+            onConfirm = { inviteCode ->
+                // TODO: 这里处理邀请码逻辑，inviteCode 是输入内容
+                println("输入的邀请码：$inviteCode")
+                showInviteCodeDialog = false
+            }
+        )
+    }
+
     if(showAddPlayroomDialog) {
         AlertDialog(
             onDismissRequest = { showAddPlayroomDialog = false },
@@ -257,10 +333,10 @@ fun playroomListScreen(
             text = {
                 AddNewPlayroom(
                     onCreatePlayroom = { newPlayroom ->
-                        // 创建成功后，触发重新加载
                         scope.launch {
                             isLoading = true
                             isLoading = loadAllPlayroom(scope)
+                            filteredRoomList = roomList.toList() // 刷新过滤列表
                         }
                         showAddPlayroomDialog = false
                     },
@@ -285,7 +361,25 @@ fun playroomListScreen(
             customTopAppBar(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
-                onAddClick = { /* 创建新播放室逻辑 */ }
+                onSearchClick = {
+                    // 搜索按钮点击时执行筛选
+                    filteredRoomList = if (searchQuery.isBlank()) {
+                        roomList.toList() // 空关键字显示全部
+                    } else {
+                        roomList.filter { room ->
+                            // 您可以根据需求调整筛选条件，比如按房间名或者简介筛选
+                            (room.r_name?.contains(searchQuery, ignoreCase = true) == true) ||
+                                    (room.r_introduction?.contains(searchQuery, ignoreCase = true) == true)
+                        }
+                    }
+                },
+                onSearchFriendPlayroomClick = {
+                    showSearchRoomDialog = true
+                },
+                onInviteCodeClick = {
+                    showInviteCodeDialog = true
+                }
+
             )
         }
     ) { padding ->
@@ -309,24 +403,25 @@ fun playroomListScreen(
                             error = null
                             isLoading = true
                             scope.launch {
-                               isLoading = loadAllPlayroom(scope)
+                                isLoading = loadAllPlayroom(scope)
+                                filteredRoomList = roomList.toList()
                             }
                         }) {
                             Text("重试")
                         }
                     }
                 }
-            } else if (roomList.isEmpty()) {
+            } else if (filteredRoomList.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("暂无播放室")
+                    Text("暂无符合条件的播放室")
                 }
             } else {
                 LazyColumn {
-                    items(roomList) { room ->
-                        room.current_url = testUrl2//用于测试
+                    items(filteredRoomList) { room ->
+                        room.current_url = testUrl2 // 用于测试
                         setPlayroomItem(
                             room = room,
                             onJoin = {
@@ -342,6 +437,7 @@ fun playroomListScreen(
         }
     }
 }
+
 
 
 
@@ -547,7 +643,7 @@ suspend fun connectToPlayroomWS(
                 }
 
                 when (msg) {
-                    is JoinMessage -> messageHandler.onUserJoined(msg)
+                    is JoinMessage -> messageHandler.onUserJoined(context,msg)
                     is UrlMessage -> messageHandler.onUrlReceived(msg)
                     is ReadyMessage -> messageHandler.onUserReady(msg)
                     is StartMessage -> messageHandler.onStart(msg)
@@ -601,4 +697,186 @@ suspend fun connectToPlayroomWS(
     } catch (e: Exception) {
         Log.e("PlayroomWebSocketManager", "连接webSocket失败", e)
     }
+}
+
+
+
+@Composable
+fun SearchRoomDialog(
+    onDismiss: () -> Unit,
+    onSearch: (String) -> Unit
+) {
+    var roomName by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "搜索朋友播放室") },
+        text = {
+            TextField(
+                value = roomName,
+                onValueChange = { roomName = it },
+                label = { Text("请输入播放室名称") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSearch(roomName.trim())
+                }
+            ) {
+                Text("搜索")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+
+@Composable
+fun InviteCodeDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var inviteCode by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "请输入邀请码") },
+        text = {
+            TextField(
+                value = inviteCode,
+                onValueChange = { inviteCode = it },
+                label = { Text("邀请码") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(inviteCode.trim())
+                }
+            ) {
+                Text("确认")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+
+fun searchPlayroomsByName(coroutineScope: CoroutineScope,name : String,context: Context): Flow<List<Playroom>> = flow {
+    try {
+        val playroomRequest = GetRequest(
+            interfaceName = "/room/search",
+            queryParams = mapOf(
+                "r_name" to name
+            )
+        )
+        val response = playroomRequest.execute(coroutineScope)
+        val gson = Gson()
+        val type = object : TypeToken<BaseResponseJsonData<List<Playroom>>>() {}.type
+        val data = gson.fromJson<BaseResponseJsonData<List<Playroom>>>(response.body?.string(), type)
+
+        if (data.data != null) {
+            Log.d("preparePlayroomData", "搜索播放室成功：${data.data}")
+            emit(data.data)
+        } else if(data.code != 200) {
+            Log.e("preparePlayroomData", "搜索播放室失败：${data.msg}")
+            Log.e("preparePlayroomData", "搜索播放室失败：${response}")
+            Toast.makeText(context, "搜索失败", Toast.LENGTH_SHORT).show()
+            emit(emptyList())
+        }
+    } catch (e: Exception) {
+        Log.e("preparePlayroomData", "搜索播放室异常：${e.message}")
+        throw e
+    }
+}.flowOn(Dispatchers.IO)
+
+
+@Composable
+fun SearchResultDialog(
+    searchRoomList: List<Playroom>,
+    onDismiss: () -> Unit,
+    onJoinRoom: (Playroom) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "搜索结果") },
+        text = {
+            if (searchRoomList.isEmpty()) {
+                Text(text = "没有找到符合条件的播放室", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 300.dp) // 限制最大高度，避免对话框过高
+                ) {
+                    items(searchRoomList) { room ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(12.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = room.r_name ?: "无名房间",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = room.r_introduction ?: "暂无介绍",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Button(
+                                    onClick = { onJoinRoom(room) },
+                                    modifier = Modifier.height(36.dp)
+                                ) {
+                                    Text(text = "加入")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
 }
