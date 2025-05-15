@@ -52,14 +52,18 @@ package com.example.myplayer
     @Composable
     fun AppNavigation() {
         val navController = rememberNavController()
+        var isLoggedIn by remember { mutableStateOf(false) }
+
         NavHost(
             navController = navController,
             startDestination = "login"
         ) {
             composable("login") {
                 LoginScreen(
-                    onLoginSuccess =       { navController.navigate("login") },
-                    navController  =         navController
+//                    onLoginSuccess =       { navController.navigate("login") },
+                    onLoginSuccess =       { },
+                    navController  =         navController,
+                    onLogout = { isLoggedIn = false }
                 )
             }
 
@@ -70,19 +74,18 @@ package com.example.myplayer
             }
 
             composable("main") {
-                HomeScreen()
+                HomeScreen(onLogout = { isLoggedIn = false })
             }
         }
 
-        var isLoggedIn by remember { mutableStateOf(false) }
 
         if (isLoggedIn)
         {
-            HomeScreen()
+            HomeScreen(onLogout = { isLoggedIn = false })
         }
         else
         {
-            LoginScreen(onLoginSuccess = { isLoggedIn = true },navController)
+            LoginScreen(onLoginSuccess = { isLoggedIn = true }, navController = navController, onLogout = { isLoggedIn = false })
         }
 
     }

@@ -8,6 +8,6 @@ data class WebSocketResponse(
     val sender_name: String,
     val target: String,
     val content: String,
-    val engage: Boolean,
+    val engaged: Boolean,
     val time: String
 )

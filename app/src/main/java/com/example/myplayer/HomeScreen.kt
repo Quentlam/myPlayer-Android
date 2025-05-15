@@ -18,7 +18,7 @@ import com.example.myplayer.framework.playroom.chosePlayroomScreen
 
 ////11
 @Composable
-fun HomeScreen() {
+fun HomeScreen(onLogout: () -> Unit) {
     val navController = rememberNavController()
     val items = listOf(
         BottomNavItem("好友", Icons.Default.Person, "friends"),
@@ -55,7 +55,7 @@ fun HomeScreen() {
         ) {
             composable("friends")  { FriendsScreen() }
             composable("chat")     { ChatScreen() }
-            composable("Me")       { SettingScreen() }
+            composable("Me")       { SettingScreen(onLogout) }
             composable("playroom") { chosePlayroomScreen() }
         }
     }

@@ -26,6 +26,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.myplayer.R
 import com.example.myplayer.model.playroom.Playroom
@@ -39,6 +40,7 @@ import com.example.myplayer.network.DatabaseProvider
 import com.example.myplayer.network.LoginRequest
 import com.example.myplayer.network.interceptor.TokenRefreshInterceptor
 import com.example.myplayer.userInfo
+import com.example.myplayer.webSocketManager
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
@@ -59,7 +61,7 @@ import java.security.NoSuchAlgorithmException
 
 @SuppressLint("ContextCastToActivity")
 @Composable
-fun SettingScreen() {
+fun SettingScreen(onLogout: () -> Unit) {
     var username by remember { mutableStateOf(userInfo.u_name) }
     var account by remember { mutableStateOf(userInfo.u_id) }
     var signature by remember { mutableStateOf(userInfo.u_introduction) }
@@ -168,6 +170,22 @@ fun SettingScreen() {
             value = "点击修改",
             onClick = { showChangePasswordDialog = true }
         )
+        
+        // 新增退出登录按钮
+        Spacer(modifier = Modifier.weight(1f))
+        Button(
+            onClick = { 
+                webSocketManager?.disconnect(onLogout)
+            },
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Text("退出登录")
+        }
     }
 
     // 修改密码对话框

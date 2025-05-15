@@ -43,9 +43,10 @@ private val TAG = "LoginScreen"
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    navController: NavHostController
+    navController: NavHostController,
+    onLogout: () -> Unit
     ) {
-    var account by remember { mutableStateOf("1959804282@qq.com") }
+    var account by remember { mutableStateOf("qkliangfeng@qq.com") } //1959804282
     var password by remember { mutableStateOf("123456") }
     var isRegister by remember { mutableStateOf(false) }
     var showErrorDialog by remember { mutableStateOf(false) }
@@ -120,7 +121,7 @@ fun LoginScreen(
 
                                     getUserInfo(coroutineScope)
                                     getFriendList(coroutineScope)
-                                    connectToWS()
+                                    connectToWS(onLogout)
                             }
                             catch (e: Exception)
                             {
@@ -172,7 +173,7 @@ suspend fun getUserInfo(coroutineScope: CoroutineScope){
         val type = object : TypeToken<BaseResponseJsonData<UserInfo>>() {}.type
         val data = gson.fromJson<BaseResponseJsonData<UserInfo>>(response.body?.string(), type)
 
-        if (data.data != null) {
+        if (data != null && data.data != null) {
             Log.d("LoginScreen", "获取用户信息成功：${data.data}")
             Log.d("LoginScreen", "u_name: ${data.data.u_name}")
 
@@ -198,7 +199,7 @@ suspend fun getFriendList(coroutineScope: CoroutineScope){
         val type = object : TypeToken<BaseResponseJsonData<List<UserInfo>>>() {}.type
         val data = Gson().fromJson<BaseResponseJsonData<List<UserInfo>>>(response.body?.string(), type)
 
-        if (data.data != null) {
+        if (data != null && data.data != null) {
             userInfo.friendList = data.data.also {
                 Log.d(com.example.myplayer.framework.chat.TAG, "好友列表更新：${it.size}条记录")
             }
@@ -214,14 +215,14 @@ suspend fun getFriendList(coroutineScope: CoroutineScope){
     }
 }
 var webSocketManager: WebSocketManager? = null;
-suspend fun connectToWS(){
+suspend fun connectToWS(onLogout: () -> Unit){
     webSocketManager = WebSocketManager("wss://www.myplayer.merlin.xin/online?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}")
     val listener = object : WebSocketListener() {
         override fun onMessage(webSocket: WebSocket, text: String) {
             val type = object : TypeToken<WebSocketResponse>() {}.type
             val data = Gson().fromJson<WebSocketResponse>(text, type)
-            if(data.engage){ //如果被占线
-                webSocketManager?.disconnect()
+            if(data.engaged){ //如果被占线
+                webSocketManager?.disconnect(onLogout)
                 Log.i(TAG, "WebSocket断开连接")
             }
             else{
@@ -246,15 +247,13 @@ suspend fun connectToWS(){
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             super.onClosed(webSocket, code, reason)
             Log.i(TAG, "连接正常关闭 code:$code reason:$reason")
-            // 触发断开回调
-//            onDisconnect?.invoke("连接关闭: $reason")
+//            webSocketManager!!.scheduleReconnect(this)
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             super.onFailure(webSocket, t, response)
             Log.e(TAG, "连接异常断开", t)
-            // 触发断开回调
-//            onDisconnect?.invoke("连接异常: ${t.message}")
+            webSocketManager!!.scheduleReconnect(this)
         }
     }
     webSocketManager?.connect(listener)
