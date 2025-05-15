@@ -69,8 +69,9 @@ import java.time.ZonedDateTime
 
 
 val messageHandler = object : PlayroomMessageHandler {
-    override fun onUserJoined(msg: JoinMessage) {//如果加入了，就需要给房间的视频连接
+    override fun onUserJoined(context : Context,msg: JoinMessage) {//如果加入了，就需要给房间的视频连接
         Log.i("roomScreenWS", "用户加入房间: ${msg.u_name}")
+        Toast.makeText(context, "${msg.u_name}加入房间！", Toast.LENGTH_SHORT).show()
         //如果是房主，那么就要发送信息给新来的人
         if(currentMemberList.find { it.role == 2 && it.m_name == userInfo.u_name } != null)
         {
@@ -211,9 +212,7 @@ fun manageRoomContent(
     }
 
 
-    // 处理邀请对话框
     if (showInvitationDialog) {
-        getInvitations(currentRoom.r_id)
         AlertDialog(
             onDismissRequest = { showInvitationDialog = false },
             title = {
@@ -242,60 +241,47 @@ fun manageRoomContent(
                         items(currentRequestList) { request ->
                             RequestItem(
                                 request = request,
-                                // 处理通过逻辑
                                 onApprove = {
+                                    // 本地移除该申请
+                                    currentRequestList = currentRequestList.filter { it != request }
+                                    // 异步请求服务器
                                     coroutineScope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            var data = BaseResponseJsonData<String>()
-                                            val response: Response
-                                            try {
-                                                response =
-                                                    BaseRequest(
-                                                        listOf(
-                                                            BaseSentJsonData("inviter", request.inviter),//申请者的id
-                                                            BaseSentJsonData("target", request.inviter),//申请者的id
-                                                            BaseSentJsonData("room", request.room),//申请的房间的id
-                                                        ),
-                                                        "/inviting/passinviting"
-                                                    ).sendPostRequest(coroutineScope)
-                                                Log.d("roomScreen","inviter:${request.inviter},target:${request.inviter},room:${request.room}")
-                                                data = JsonToBaseResponse<String>(response).getResponseData()
-                                                Log.d("roomScreen", "同意加入房间成功！${response.toString()}")
-                                                Log.d("roomScreen", "同意加入房间成功！${data.msg}")
-                                                Log.d("roomScreen", "同意加入房间成功！${data}")
-
-                                            } catch (e: Exception) {
-                                                Log.e("roomScreen", "同意加入房间失败！${e}")
-                                            }
+                                        try {
+                                            val response = BaseRequest(
+                                                listOf(
+                                                    BaseSentJsonData("inviter", request.inviter),
+                                                    BaseSentJsonData("target", request.inviter),
+                                                    BaseSentJsonData("room", request.room)
+                                                ),
+                                                "/inviting/passinviting"
+                                            ).sendPostRequest(coroutineScope)
+                                            val data = JsonToBaseResponse<String>(response).getResponseData()
+                                            Log.d("roomScreen", "同意加入房间成功！${data.msg}")
+                                        } catch (e: Exception) {
+                                            Log.e("roomScreen", "同意加入房间失败！${e}")
+                                            // 失败时，可以考虑恢复该申请
+                                            currentRequestList = currentRequestList + request
                                         }
                                     }
                                 },
-                                // 处理拒绝逻辑
                                 onReject = {
+                                    // 本地移除该申请
+                                    currentRequestList = currentRequestList.filter { it != request }
                                     coroutineScope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            Log.d("roomScreen",
-                                                "inviter:${request.inviter} " +
-                                                        "target:${request.inviter} " +
-                                                        "room:${request.room} "
-                                            )
-                                            var data = BaseResponseJsonData<String>()
-                                            var response: Response
-                                            try {
-                                                response =
-                                                    BaseRequest(
-                                                        listOf(
-                                                            BaseSentJsonData("inviter", request.inviter),//申请者的id
-                                                            BaseSentJsonData("target", request.inviter),//申请者的id
-                                                            BaseSentJsonData("room", request.room),//申请的房间的id
-                                                        ),
-                                                        "/refuseinviting"
-                                                    ).sendPostRequest(coroutineScope)
-                                                data = JsonToBaseResponse<String>(response).getResponseData()
-                                                Log.d("roomScreen", "拒绝加入房间成功！${data.msg}")
-                                            } catch (e: Exception) {
-                                                Log.e("roomScreen", "拒绝加入房间失败！${e}")
-                                            }
+                                        try {
+                                            val response = BaseRequest(
+                                                listOf(
+                                                    BaseSentJsonData("inviter", request.inviter),
+                                                    BaseSentJsonData("target", request.inviter),
+                                                    BaseSentJsonData("room", request.room)
+                                                ),
+                                                "/refuseinviting"
+                                            ).sendPostRequest(coroutineScope)
+                                            val data = JsonToBaseResponse<String>(response).getResponseData()
+                                            Log.d("roomScreen", "拒绝加入房间成功！${data.msg}")
+                                        } catch (e: Exception) {
+                                            Log.e("roomScreen", "拒绝加入房间失败！${e}")
+                                            currentRequestList = currentRequestList + request
                                         }
                                     }
                                 }
@@ -643,7 +629,7 @@ fun roomScreen(
                     Tab(
                         selected = currentTab == 1,
                         onClick = { currentTab = 1 },
-                        text = { Text("在线成员") }
+                        text = { Text("房间成员") }
                     )
                     Tab(
                         selected = currentTab == 2,

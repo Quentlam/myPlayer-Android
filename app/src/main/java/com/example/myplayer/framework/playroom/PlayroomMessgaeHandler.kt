@@ -13,7 +13,7 @@ import com.example.myplayer.model.playroom.UrlMessage
 import kotlinx.coroutines.CoroutineScope
 
 interface PlayroomMessageHandler {
-    fun onUserJoined(msg: JoinMessage)
+    fun onUserJoined(context : Context,msg: JoinMessage)
     fun onUrlReceived(msg: UrlMessage)
     fun onUserReady(msg: ReadyMessage)
     fun onStart(msg: StartMessage)

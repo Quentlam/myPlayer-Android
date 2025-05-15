@@ -1,5 +1,6 @@
 package com.example.myplayer.framework.playroom
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,26 +11,44 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.myplayer.model.BaseResponseJsonData
+import com.example.myplayer.model.playroom.Playroom
+import com.example.myplayer.network.networkAPI.GetRequest
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
 
 @Composable
 fun chosePlayroomScreen() {
@@ -50,17 +69,20 @@ fun chosePlayroomScreen() {
     }
 }
 
+
 @Composable
 fun customTopAppBar(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    onAddClick: () -> Unit
+    onSearchClick: () -> Unit,
+    onSearchFriendPlayroomClick: () -> Unit = {},
+    onInviteCodeClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(Color(0xFFF19E9E))//粉色背景
+            .background(Color(0xFFF19E9E)) // 粉色背景
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -91,7 +113,7 @@ fun customTopAppBar(
             }
             if (searchQuery.isEmpty()) {
                 Text(
-                    "搜索播放室",
+                    "搜索已经加入的播放室",
                     color = Color.Gray,
                     modifier = Modifier.padding(start = 40.dp, top = 10.dp)
                 )
@@ -101,12 +123,54 @@ fun customTopAppBar(
         Spacer(modifier = Modifier.width(16.dp))
         Button(
             onClick = {
-
+                onSearchClick()
             }
         ) {
             Text("搜索")
         }
+        Spacer(modifier = Modifier.width(16.dp))
 
+        // 新增部分：白色加号按钮和菜单
+        var expanded by remember { mutableStateOf(false) }
+        Box {
+            IconButton(
+                onClick = { expanded = true },
+                modifier = Modifier
+                    .width(24.dp)
+                    .height(24.dp)
+                    .background(Color.White, shape = CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "新增菜单",
+                    tint = Color.Black,
+                    modifier = Modifier.width(24.dp)
+                        .height(24.dp)
+                )
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(Color.White)
+            ) {
+                DropdownMenuItem(
+                    onClick = {
+                        expanded = false
+                        onSearchFriendPlayroomClick()
+                    },
+                    text = { Text("搜索朋友播放室") },
+                )
+                DropdownMenuItem(
+                    onClick = {
+                        expanded = false
+                        onInviteCodeClick()
+                    },
+                    text = { Text("邀请码进入") },
+                )
+
+            }
+        }
     }
 }
 
