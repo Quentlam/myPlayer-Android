@@ -1,5 +1,6 @@
 package com.example.myplayer.framework.playroom
 
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -15,10 +16,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,7 +44,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Response
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.draw.clip
@@ -54,9 +51,140 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.rememberAsyncImagePainter
 import com.example.myplayer.framework.playroom.player.exoPlayerView
+import com.example.myplayer.model.playroom.JoinMessage
 import com.example.myplayer.model.playroom.Member
+import com.example.myplayer.model.playroom.Message
+import com.example.myplayer.model.playroom.ReadyMessage
+import com.example.myplayer.model.playroom.StartMessage
+import com.example.myplayer.model.playroom.StopMessage
+import com.example.myplayer.model.playroom.SynchronousRequestMessage
+import com.example.myplayer.model.playroom.SynchronousResponseMessage
+import com.example.myplayer.model.playroom.UrlMessage
 import com.example.myplayer.network.BaseInformation
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import org.json.JSONObject
+import java.time.ZoneId
+import java.time.ZonedDateTime
+
+
+val messageHandler = object : PlayroomMessageHandler {
+    override fun onUserJoined(msg: JoinMessage) {//如果加入了，就需要给房间的视频连接
+        Log.i("roomScreenWS", "用户加入房间: ${msg.u_name}")
+        //如果是房主，那么就要发送信息给新来的人
+        if(currentMemberList.find { it.role == 2 && it.m_name == userInfo.u_name } != null)
+        {
+            try {
+                val wsComStr = JSONObject().apply {
+                    put("type", "url") // 弹幕消息类型
+                    put("r_id", currentRoom.r_id) // 房间ID
+                    put("from", userInfo.u_id) // 发送者u_id
+                    put("to", msg.u_id) // 接收者的u_id
+                    put("url", currentRoom.current_url) // 当前房间的视频连接
+                }.toString()
+                playRoomWebSocketManager?.sendMessage(wsComStr)
+                Log.d("roomScreenWS","房主将视频信息发送给刚加入房间的用户发送成功！：${wsComStr}")
+            }
+            catch (e : Exception)
+            {
+                Log.e("roomScreenWS","房主将视频信息发送给刚加入房间的用户失败！！：${e.message}")
+            }
+        }
+
+        // 只有房主处理，您可以在这里实现相关逻辑
+    }
+    override fun onUrlReceived(msg: UrlMessage) {
+        Log.i("roomScreenWS", "收到视频链接: ${msg.url}")
+        // 加载视频，准备就绪后调用服务器发送 ready 消息
+    }
+    override fun onUserReady(msg: ReadyMessage) {
+        Log.i("roomScreenWS", "用户准备就绪: ${msg.fromUserId}")
+        try {
+            val wsComStr = JSONObject().apply {
+                put("type", "ready") // 弹幕消息类型
+                put("r_id", currentRoom.r_id) // 房间ID
+                put("from", userInfo.u_id) // 发送者u_id
+            }.toString()
+            playRoomWebSocketManager?.sendMessage(wsComStr)
+            Log.d("roomScreenWS","用户准备就绪发送成功！：${wsComStr}")
+        }
+        catch (e : Exception)
+        {
+            Log.e("roomScreenWS","用户准备就绪发送失败！！：${e.message}")
+        }
+    }
+    override fun onStart(msg: StartMessage) {
+        Log.i("roomScreenWS", "开始播放")
+        // 启动播放器
+    }
+    override fun onStop(msg: StopMessage) {
+        Log.i("roomScreenWS", "暂停播放")
+        // 暂停播放器
+    }
+    override fun onSynchronousRequest(msg: SynchronousRequestMessage) {//等下修改
+        try {
+            val wsComStr = JSONObject().apply {
+                put("type", "synchronous request") // 弹幕消息类型
+                put("r_id", currentRoom.r_id) // 房间ID
+                put("from", userInfo.u_id) // 发送者u_id
+            }.toString()
+            playRoomWebSocketManager?.sendMessage(wsComStr)
+            Log.d("roomScreenWS","用户向房主获取当前时间戳发送成功！：${wsComStr}")
+        }
+        catch (e : Exception)
+        {
+            Log.e("roomScreenWS","用户向房主获取当前时间戳发送失败！！：${e.message}")
+        }
+        Log.i("roomScreenWS", "同步请求")
+    }
+    // 房主暂停播放，获取时间戳，发送同步响应
+    override fun onSynchronousResponse(msg: SynchronousResponseMessage) {
+        val positionMs = (msg.currentTime * 1000).toLong()
+        onUpdateStartPositionMs(positionMs)
+        try {
+            val wsComStr = JSONObject().apply {
+                put("type", "synchronous response") // 弹幕消息类型
+                put("r_id", currentRoom.r_id) // 房间ID
+                put("from", userInfo.u_id) // 发送者u_id
+                put("url", currentRoom.current_url) // 房间url
+                put("currentTime", userInfo.u_id) // 发送者u_id
+            }.toString()
+            playRoomWebSocketManager?.sendMessage(wsComStr)
+            Log.d("roomScreenWS","用户向房主获取当前时间戳发送成功！：${wsComStr}")
+        }
+        catch (e : Exception)
+        {
+            Log.e("roomScreenWS","用户向房主获取当前时间戳发送失败！！：${e.message}")
+        }
+        Log.i("roomScreenWS", "同步响应，时间戳: ${msg.currentTime}")
+    }
+
+
+    override fun onChatMessage(context : Context, coroutineScope : CoroutineScope, content: Message) {
+        Log.d("roomScreenWS","收到服务器弹幕信息！:${content.content}")
+        coroutineScope.launch {
+            savePlayroomMessage(
+                context,
+                PlayroomContent(
+                    0,
+                    currentRoom.r_id,
+                    content.fromUserId,
+                    content.u_name,
+                    content.content,
+                    ZonedDateTime.now(ZoneId.of("Asia/Shanghai"))
+                        .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))
+                )
+            )
+        }
+    }
+
+
+    override fun onUpdateStartPositionMs(ms: Long) {
+        Log.i("roomScreenWS", "更新播放位置: $ms ms")
+        // 通过您已有的回调更新UI播放位置
+    }
+
+}
 
 @Composable
 fun manageRoomContent(
@@ -85,6 +213,7 @@ fun manageRoomContent(
 
     // 处理邀请对话框
     if (showInvitationDialog) {
+        getInvitations(currentRoom.r_id)
         AlertDialog(
             onDismissRequest = { showInvitationDialog = false },
             title = {
@@ -117,13 +246,8 @@ fun manageRoomContent(
                                 onApprove = {
                                     coroutineScope.launch {
                                         withContext(Dispatchers.IO) {
-                                            Log.d("roomScreen",
-                                                "inviter:${request.inviter} " +
-                                                        "target:${request.inviter} " +
-                                                        "room:${request.room} "
-                                            )
                                             var data = BaseResponseJsonData<String>()
-                                            var response: Response
+                                            val response: Response
                                             try {
                                                 response =
                                                     BaseRequest(
@@ -132,10 +256,14 @@ fun manageRoomContent(
                                                             BaseSentJsonData("target", request.inviter),//申请者的id
                                                             BaseSentJsonData("room", request.room),//申请的房间的id
                                                         ),
-                                                        "/passinviting"
+                                                        "/inviting/passinviting"
                                                     ).sendPostRequest(coroutineScope)
+                                                Log.d("roomScreen","inviter:${request.inviter},target:${request.inviter},room:${request.room}")
                                                 data = JsonToBaseResponse<String>(response).getResponseData()
+                                                Log.d("roomScreen", "同意加入房间成功！${response.toString()}")
                                                 Log.d("roomScreen", "同意加入房间成功！${data.msg}")
+                                                Log.d("roomScreen", "同意加入房间成功！${data}")
+
                                             } catch (e: Exception) {
                                                 Log.e("roomScreen", "同意加入房间失败！${e}")
                                             }
@@ -444,9 +572,30 @@ fun roomScreen(
     var messageInput by remember { mutableStateOf("") }
     val messageList by getPlayroomMessage(context, currentRoom.r_id)
         .collectAsStateWithLifecycle(initialValue = emptyList())//直接获取Flow并且转换为Status
+    var startPositionMs by remember { mutableStateOf(0L) }
+
+
 
     // 添加 LazyListState 来控制滚动
     val listState = rememberLazyListState()
+
+    DisposableEffect(Unit) {
+        // 进入roomScreen，启动连接
+        scope.launch {
+            connectToPlayroomWS(
+                roomId = currentRoom.r_id,
+                context = context,
+                coroutineScope = scope,
+                messageHandler = messageHandler
+            )
+        }
+        onDispose {
+            // 离开roomScreen，断开WebSocket
+            playRoomWebSocketManager?.disconnect()
+            playRoomWebSocketManager = null
+            Log.d("roomScreen", "roomScreen离开，WebSocket已正常断开")
+        }
+    }
 
     // 当消息列表更新时，自动滚动到底部
     LaunchedEffect(messageList.size) {
@@ -455,7 +604,6 @@ fun roomScreen(
         }
     }
     getMembers(currentRoom.r_id)
-    getInvitations(currentRoom.r_id)
 
     Scaffold(
     ) { padding ->
@@ -474,6 +622,7 @@ fun roomScreen(
                     exoPlayerView(
                         context = LocalContext.current,
                         videoUrl = it,
+                        startPositionMs = startPositionMs,
                         lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
                     )
                 }
@@ -551,9 +700,8 @@ fun roomScreen(
                 Button(
                     onClick = {
                         if (messageInput.isNotBlank()) {
-                            //messageList.add(messageInput)
                             scope.launch {//保存弹幕信息
-                                messageInput = savePlayroomMessage(
+                                savePlayroomMessage(
                                     context,
                                     PlayroomContent(
                                         0,
@@ -561,9 +709,27 @@ fun roomScreen(
                                         userInfo.u_id,
                                         userInfo.u_name,
                                         messageInput,
-                                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                                        ZonedDateTime.now(ZoneId.of("Asia/Shanghai"))
+                                            .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))
                                     )
                                 )
+                                // 发送弹幕的点击事件里，补充完整JSONObject构造
+                                try {
+                                    val wsComStr = JSONObject().apply {
+                                        put("type", "message") // 弹幕消息类型
+                                        put("r_id", currentRoom.r_id) // 房间ID
+                                        put("from", userInfo.u_id) // 发送者u_id
+                                        put("u_name", userInfo.u_name) // 发送者u_id
+                                        put("content", messageInput)  // 弹幕内容
+                                    }.toString()
+                                    playRoomWebSocketManager?.sendMessage(wsComStr)
+                                    Log.d("PlayroomWebSocketManager","本地弹幕信息发送成功！：${wsComStr}")
+                                    messageInput = ""
+                                }
+                                catch (e : Exception)
+                                {
+                                    Log.e("PlayroomWebSocketManager","本地弹幕信息发送失败！：${e.message}")
+                                }
                             }
                         }
                     },
@@ -736,3 +902,4 @@ suspend fun uploadImageAndGetUrl(uri: Uri): String {//待定，因为服务器�
     delay(1000) // 模拟网络上传延迟
     return "https://123.png"
 }
+

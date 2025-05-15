@@ -1,7 +1,6 @@
 package com.example.myplayer.framework.playroom
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -32,13 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.material3.*
-import com.example.myplayer.model.playroom.Playroom
 
 @Composable
 fun chosePlayroomScreen() {
     val localNavController = rememberNavController()
-
     NavHost(
         navController = localNavController,
         startDestination = "playroomList"
@@ -114,5 +109,6 @@ fun customTopAppBar(
 
     }
 }
+
 
 

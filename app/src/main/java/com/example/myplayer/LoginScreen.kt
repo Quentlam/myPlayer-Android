@@ -45,7 +45,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     navController: NavHostController
     ) {
-    var account by remember { mutableStateOf("qkliangfeng@qq.com") }
+    var account by remember { mutableStateOf("1959804282@qq.com") }
     var password by remember { mutableStateOf("123456") }
     var isRegister by remember { mutableStateOf(false) }
     var showErrorDialog by remember { mutableStateOf(false) }

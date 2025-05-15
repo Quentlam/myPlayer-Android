@@ -29,6 +29,10 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import com.example.myplayer.network.BaseInformation.currentRoom
+import com.example.myplayer.userInfo
+import com.example.myplayer.webSocketManager
+import org.json.JSONObject
 
 
 @OptIn(UnstableApi::class)
@@ -36,6 +40,7 @@ import androidx.compose.material3.Text
 fun exoPlayerView(
     context: Context,
     videoUrl: String,
+    startPositionMs: Long = 0L,  // 新增参数，默认0
     lifecycleOwner: LifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 ) {
     // 用于触发重新加载的状态变量，每次+1时触发播放器重载
@@ -48,7 +53,7 @@ fun exoPlayerView(
         }
 
         // 播放器视图容器，监听 reloadTrigger 变化重载
-        PlayerViewContainer(context = context, videoUrl = videoUrl, reloadTrigger = reloadTrigger, lifecycleOwner = lifecycleOwner)
+        PlayerViewContainer(context = context, videoUrl = videoUrl, reloadTrigger = reloadTrigger,startPositionMs = startPositionMs,lifecycleOwner = lifecycleOwner)
     }
 }
 
@@ -58,6 +63,7 @@ private fun PlayerViewContainer(
     context: Context,
     videoUrl: String,
     reloadTrigger: Int,
+    startPositionMs: Long = 0L,  // 新增参数，默认0
     lifecycleOwner: LifecycleOwner
 ) {
     if (videoUrl.isEmpty()) {
@@ -126,6 +132,49 @@ private fun PlayerViewContainer(
                             }
                         }
                     }
+
+                    override fun onPositionDiscontinuity(
+                        oldPosition: Player.PositionInfo,
+                        newPosition: Player.PositionInfo,
+                        reason: Int
+                    ) {
+                        super.onPositionDiscontinuity(oldPosition, newPosition, reason)
+
+                        val oldPosMs = oldPosition.positionMs
+                        val newPosMs = newPosition.positionMs
+
+                        Log.d("exoPlayerWS", "播放位置跳变，旧位置: $oldPosMs ms， 新位置: $newPosMs ms，原因: $reason")
+
+                        when (reason) {
+                            Player.DISCONTINUITY_REASON_SEEK -> {
+                                Log.d("exoPlayerWS", "跳变原因：Seek跳转")
+//                                try {//这里待定，因为服务器那边还没有同步的消息体
+//                                    val wsComStr = JSONObject().apply {
+//                                        put("type", "url") // 弹幕消息类型
+//                                        put("r_id", currentRoom.r_id) // 房间ID
+//                                        put("from", userInfo.u_id) // 发送者u_id
+//                                        put("timestamp",newPosition) // 当前房间的视频的时间戳
+//                                    }.toString()
+//                                    webSocketManager?.sendMessage(wsComStr)
+//                                    Log.d("exoPlayerWS","房主将视频信息同步房间的用户发送成功！：${wsComStr}")
+//                                }
+//                                catch (e : Exception)
+//                                {
+//                                    Log.e("exoPlayerWS","房主将视频信息同步房间的用户失败！！：${e.message}")
+//                                }
+                            }
+                            Player.DISCONTINUITY_REASON_INTERNAL -> {
+                                Log.d("exoPlayerWS", "跳变原因：播放器内部原因")
+                            }
+                            Player.DISCONTINUITY_REASON_REMOVE -> {
+                                Log.d("exoPlayerWS", "跳变原因：播放段被移除")
+                            }
+                            else -> {
+                                Log.d("exoPlayerWS", "跳变原因：未知($reason)")
+                            }
+                        }
+                    }
+
                 })
             }
     }
@@ -179,6 +228,11 @@ private fun PlayerViewContainer(
 
             exoPlayer.setMediaSource(mediaSource)
             exoPlayer.prepare()
+
+            if (startPositionMs > 0) {
+                exoPlayer.seekTo(startPositionMs)
+            }
+
             exoPlayer.playWhenReady = true
 
             playerView.player = exoPlayer

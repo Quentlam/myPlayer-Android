@@ -1,6 +1,9 @@
 package com.example.myplayer.framework.playroom
 
+import android.app.VoiceInteractor
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,15 +41,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.example.myplayer.WebSocketManager
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
 import com.example.myplayer.model.BaseResponseJsonData
 import com.example.myplayer.model.BaseSentJsonData
+import com.example.myplayer.model.playroom.JoinMessage
 import com.example.myplayer.model.playroom.RequestDetails
+import com.example.myplayer.model.playroom.ReadyMessage
+import com.example.myplayer.model.playroom.StartMessage
+import com.example.myplayer.model.playroom.StopMessage
+import com.example.myplayer.model.playroom.SynchronousRequestMessage
+import com.example.myplayer.model.playroom.RoomWebSocketMessage
 import com.example.myplayer.model.playroom.Member
+import com.example.myplayer.model.playroom.Message
 import com.example.myplayer.model.playroom.Playroom
 import com.example.myplayer.model.playroom.PlayroomContent
+import com.example.myplayer.model.playroom.SynchronousResponseMessage
+import com.example.myplayer.model.playroom.UrlMessage
+import com.example.myplayer.network.BaseInformation
 import com.example.myplayer.network.BaseInformation.currentMemberList
 import com.example.myplayer.network.BaseInformation.currentRequestList
 import com.example.myplayer.network.BaseInformation.currentRoom
@@ -55,6 +70,8 @@ import com.example.myplayer.network.BaseInformation.testUrl2
 import com.example.myplayer.network.BaseRequest
 import com.example.myplayer.network.DatabaseProvider
 import com.example.myplayer.network.networkAPI.GetRequest
+import com.example.myplayer.userInfo
+import com.example.myplayer.webSocketManager
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +82,20 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okhttp3.internal.http2.Http2Reader
+import org.json.JSONObject
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+
 
 @Composable
 fun getInvitations(roomId: String)
@@ -74,10 +105,9 @@ fun getInvitations(roomId: String)
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(roomId) {
+        isLoading = true
+        error = null
         try {
-            isLoading = true
-            error = null
-
             val inviteRequest = GetRequest(
                 interfaceName = "/inviting/getinvitings/${roomId}",
                 queryParams = mapOf()
@@ -153,7 +183,7 @@ fun getMembers(roomId: String)
 
 
 
-suspend fun getAllPlayrooms(coroutineScope: CoroutineScope): Flow<List<Playroom>> = flow {
+fun getAllPlayrooms(coroutineScope: CoroutineScope): Flow<List<Playroom>> = flow {
     try {
         val playroomRequest = GetRequest(
             interfaceName = "/room/getrooms",
@@ -210,6 +240,10 @@ fun playroomListScreen(
     // 修改状态声明
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+
+
     // 使用 collectAsState 来收集 Flow
     LaunchedEffect(Unit) {
                 isLoading = loadAllPlayroom(scope)
@@ -339,12 +373,12 @@ fun getPlayroomMessage(context : Context,roomId : String) : Flow<List<PlayroomCo
 {
     try {
         val dao = DatabaseProvider.getPlayRoomDatabase(context).playroomContentDao()
-        Log.d("saveData","获取当前房间的弹幕信息成功！${dao.getCurrentPlayroomContent(roomId)}")
+        Log.d("preparePlayroomData","获取当前房间的弹幕信息成功！")
         return dao.getCurrentPlayroomContent(roomId)
     }
     catch (e : Exception)
     {
-        Log.e("saveData","弹幕消息存储失败！${e.message}")
+        Log.e("preparePlayroomData","弹幕消息存储失败！${e.message}")
         return emptyFlow()
     }
 }
@@ -472,5 +506,99 @@ fun AddNewPlayroom(
                 Text("创建播放室")
             }
         }
+    }
+}
+
+
+var playRoomWebSocketManager: PlayroomWebSocketManager? = null;
+suspend fun connectToPlayroomWS(
+    roomId: String,
+    context: Context,
+    coroutineScope: CoroutineScope,
+    messageHandler: PlayroomMessageHandler
+) {
+    try {
+        playRoomWebSocketManager = PlayroomWebSocketManager("wss://www.myplayer.merlin.xin/video?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}&r_id=${currentRoom.r_id}")
+        val json = Json {
+            ignoreUnknownKeys = true
+            classDiscriminator = "type" // 与服务端字段对应，不能改
+            isLenient = true
+            serializersModule = SerializersModule {
+                polymorphic(RoomWebSocketMessage::class) {
+                    subclass(JoinMessage::class, JoinMessage.serializer())
+                    subclass(UrlMessage::class, UrlMessage.serializer())
+                    subclass(ReadyMessage::class, ReadyMessage.serializer())
+                    subclass(StartMessage::class, StartMessage.serializer())
+                    subclass(StopMessage::class, StopMessage.serializer())
+                    subclass(SynchronousRequestMessage::class, SynchronousRequestMessage.serializer())
+                    subclass(SynchronousResponseMessage::class, SynchronousResponseMessage.serializer())
+                }
+            }
+        }
+
+        val listener = object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+
+                val msg = try {
+                    json.decodeFromString(RoomWebSocketMessage.serializer(), text)
+                } catch (e: Exception) {
+                    Log.e("PlayroomWebSocketManager", "反序列化消息失败：$text", e)
+                    return
+                }
+
+                when (msg) {
+                    is JoinMessage -> messageHandler.onUserJoined(msg)
+                    is UrlMessage -> messageHandler.onUrlReceived(msg)
+                    is ReadyMessage -> messageHandler.onUserReady(msg)
+                    is StartMessage -> messageHandler.onStart(msg)
+                    is StopMessage -> messageHandler.onStop(msg)
+                    is SynchronousRequestMessage -> messageHandler.onSynchronousRequest(msg)
+                    is SynchronousResponseMessage -> messageHandler.onSynchronousResponse(msg)
+                    is Message -> messageHandler.onChatMessage(context,coroutineScope,msg)
+                }
+            }
+
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                super.onOpen(webSocket, response)
+                Log.d("PlayroomWebSocketManager", "房间：${currentRoom.r_id}WebSocket连接成功！")
+                // 此处可以通知UI或更新状态：连接已建立
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                Log.e("PlayroomWebSocketManager", "WebSocket连接失败，准备重连", t)
+                restartWebSocketWithDelay()
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                Log.d("PlayroomWebSocketManager", "WebSocket已关闭，准备重连")
+                restartWebSocketWithDelay()
+            }
+
+            private fun restartWebSocketWithDelay() {
+                try {
+                    // 3秒后重连，避免频繁重连导致资源浪费或被封禁
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        Log.d("PlayroomWebSocketManager", "开始重连WebSocket")
+                        // 重新调用连接函数
+                        coroutineScope.launch {
+                            connectToPlayroomWS(
+                                currentRoom.r_id,
+                                context,
+                                coroutineScope,
+                                messageHandler
+                            )
+                        }
+                    }, 3000)
+                }
+                catch (e : Exception)
+                {
+                    Log.e("PlayroomWebSocketManager", "WebSocket重连失败:${e.message}")
+                }
+            }
+        }
+        playRoomWebSocketManager?.connect(listener)
+        Log.d("PlayroomWebSocketManager", "尝试连接：wss://www.myplayer.merlin.xin/video?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}&r_id=${currentRoom.r_id}")
+    } catch (e: Exception) {
+        Log.e("PlayroomWebSocketManager", "连接webSocket失败", e)
     }
 }

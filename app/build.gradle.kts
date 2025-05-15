@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
+    kotlin("plugin.serialization") version "2.0.0" // 版本根据实际调整
 }
 
 android {
@@ -89,4 +90,7 @@ dependencies {
 
 // 网络层（推荐 OkHttp）
     implementation("androidx.media3:media3-datasource-okhttp:$media3_version")
+
+
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 }
