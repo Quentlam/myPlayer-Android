@@ -213,6 +213,7 @@ fun manageRoomContent(
 
 
     if (showInvitationDialog) {
+        getInvitations(currentRoom.r_id)
         AlertDialog(
             onDismissRequest = { showInvitationDialog = false },
             title = {
