@@ -8,17 +8,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,13 +52,17 @@ import okhttp3.Response
 import java.time.format.DateTimeFormatter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
 import com.example.myplayer.framework.playroom.player.exoPlayerView
 import com.example.myplayer.model.playroom.JoinMessage
 import com.example.myplayer.model.playroom.Member
 import com.example.myplayer.model.playroom.Message
+import com.example.myplayer.model.playroom.Playroom
 import com.example.myplayer.model.playroom.ReadyMessage
 import com.example.myplayer.model.playroom.StartMessage
 import com.example.myplayer.model.playroom.StopMessage
@@ -195,6 +204,9 @@ fun manageRoomContent(
     var showRoomSetting by remember { mutableStateOf(false) }
     var showSuccessToast by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    getInvitations(currentRoom.r_id)
+
 
     // 房间设置弹窗临时状态
     var videoUrl by remember { mutableStateOf(currentRoom.current_url ?: "") }
@@ -213,7 +225,6 @@ fun manageRoomContent(
 
 
     if (showInvitationDialog) {
-        getInvitations(currentRoom.r_id)
         AlertDialog(
             onDismissRequest = { showInvitationDialog = false },
             title = {
@@ -245,43 +256,94 @@ fun manageRoomContent(
                                 onApprove = {
                                     // 本地移除该申请
                                     currentRequestList = currentRequestList.filter { it != request }
+                                    var response: Response? = null
                                     // 异步请求服务器
                                     coroutineScope.launch {
+                                        Log.d(
+                                            "roomScreen",
+                                            "向服务器发送同意进入房间！${request.inviter},${request.inviter},${request.inviter}"
+                                        )
+
                                         try {
-                                            val response = BaseRequest(
-                                                listOf(
-                                                    BaseSentJsonData("inviter", request.inviter),
-                                                    BaseSentJsonData("target", request.inviter),
-                                                    BaseSentJsonData("room", request.room)
-                                                ),
-                                                "/inviting/passinviting"
-                                            ).sendPostRequest(coroutineScope)
-                                            val data = JsonToBaseResponse<String>(response).getResponseData()
-                                            Log.d("roomScreen", "同意加入房间成功！${data.msg}")
+                                            withContext(Dispatchers.IO) {
+                                                response = BaseRequest(
+                                                    listOf(
+                                                        BaseSentJsonData(
+                                                            "inviter",
+                                                            request.inviter
+                                                        ),
+                                                        BaseSentJsonData(
+                                                            "target",
+                                                            request.inviter
+                                                        ),
+                                                        BaseSentJsonData("room", request.room)
+                                                    ),
+                                                    "/inviting/passinviting"
+                                                ).sendPostRequest(coroutineScope)
+                                                val data =
+                                                    JsonToBaseResponse<String>(response!!).getResponseData()
+
+                                                Log.d(
+                                                    "roomScreen",
+                                                    "同意加入房间成功！${data.msg}"
+                                                )
+                                                withContext(Dispatchers.Main) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "同意加入房间成功！${data.msg}",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            }
                                         } catch (e: Exception) {
-                                            Log.e("roomScreen", "同意加入房间失败！${e}")
+                                            Toast.makeText(
+                                                context,
+                                                "同意加入房间失败！：${response?.message.toString()}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            Log.e("roomScreen", "同意加入房间失败！${e.message}")
                                             // 失败时，可以考虑恢复该申请
                                             currentRequestList = currentRequestList + request
                                         }
+
                                     }
                                 },
                                 onReject = {
+                                    var response : Response? = null
                                     // 本地移除该申请
                                     currentRequestList = currentRequestList.filter { it != request }
                                     coroutineScope.launch {
                                         try {
-                                            val response = BaseRequest(
-                                                listOf(
-                                                    BaseSentJsonData("inviter", request.inviter),
-                                                    BaseSentJsonData("target", request.inviter),
-                                                    BaseSentJsonData("room", request.room)
-                                                ),
-                                                "/refuseinviting"
-                                            ).sendPostRequest(coroutineScope)
-                                            val data = JsonToBaseResponse<String>(response).getResponseData()
-                                            Log.d("roomScreen", "拒绝加入房间成功！${data.msg}")
+                                            withContext(Dispatchers.IO) {
+                                                response = BaseRequest(
+                                                    listOf(
+                                                        BaseSentJsonData(
+                                                            "inviter",
+                                                            request.inviter
+                                                        ),
+                                                        BaseSentJsonData("target", request.inviter),
+                                                        BaseSentJsonData("room", request.room)
+                                                    ),
+                                                    "/refuseinviting"
+                                                ).sendPostRequest(coroutineScope)
+                                                val data =
+                                                    JsonToBaseResponse<String>(response!!).getResponseData()
+                                                Log.d("roomScreen", "拒绝加入房间成功！${data.msg}")
+                                                withContext(Dispatchers.Main) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "同意加入房间成功！${data.msg}",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            }
                                         } catch (e: Exception) {
                                             Log.e("roomScreen", "拒绝加入房间失败！${e}")
+                                                Toast.makeText(
+                                                    context,
+                                                    "拒绝加入房间失败！${response?.body.toString()}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
                                             currentRequestList = currentRequestList + request
                                         }
                                     }
@@ -366,14 +428,15 @@ fun manageRoomContent(
                                 val uploadedUrl = uploadImageAndGetUrl(avatarUri!!)
                                 // 更新头像URL和currentRoom数据
                                 avatarUrl = uploadedUrl
-                                BaseInformation.currentRoom = BaseInformation.currentRoom.copy(r_avatar = uploadedUrl)                            } catch (e: Exception) {
+                                currentRoom = currentRoom.copy(r_avatar = uploadedUrl)
+                            } catch (e: Exception) {
                                 // 上传失败处理
                                 Log.e("manageRoomContent", "头像上传失败: $e")
                             }
                         }
                         // 更新视频流地址
-                        BaseInformation.currentRoom = BaseInformation.currentRoom.copy(current_url = videoUrl)
-                        Log.d("roomScreen","修改视频URL成功！${currentRoom.current_url}")
+                        currentRoom = currentRoom.copy(current_url = videoUrl)
+                        Log.d("roomScreen", "修改视频URL成功！${currentRoom.current_url}")
                         showSuccessToast = true
                         showRoomSetting = false
                         // 清空本地Uri状态
@@ -549,10 +612,11 @@ private fun ManagementItem(
 }
 
 @Composable
-fun roomScreen(
-    navController: NavController,
-) {
-    Log.d("chosePlayroomScreen","现在的房间ID：${currentRoom.r_id},视频连接：${currentRoom.current_url},头像URL${currentRoom.r_avatar},房间介绍${currentRoom.r_introduction},房间名字${currentRoom.r_name}")
+fun roomScreen(room : Playroom,onBack: () -> Unit) {
+    Log.d(
+        "chosePlayroomScreen",
+        "现在的房间ID：${currentRoom.r_id},视频连接：${currentRoom.current_url},头像URL${currentRoom.r_avatar},房间介绍${currentRoom.r_introduction},房间名字${currentRoom.r_name}"
+    )
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var currentTab by remember { mutableStateOf(0) }
@@ -560,7 +624,6 @@ fun roomScreen(
     val messageList by getPlayroomMessage(context, currentRoom.r_id)
         .collectAsStateWithLifecycle(initialValue = emptyList())//直接获取Flow并且转换为Status
     var startPositionMs by remember { mutableStateOf(0L) }
-
 
 
     // 添加 LazyListState 来控制滚动
@@ -581,6 +644,7 @@ fun roomScreen(
             playRoomWebSocketManager?.disconnect()
             playRoomWebSocketManager = null
             Log.d("roomScreen", "roomScreen离开，WebSocket已正常断开")
+            Toast.makeText(context, "已离开房间！:${currentRoom.r_id}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -644,16 +708,18 @@ fun roomScreen(
                     when (currentTab) {
                         0 -> LazyColumn(
                             state = listState
-                        ){
+                        ) {
                             items(messageList) { message ->
                                 messageElment(message)
                             }
                         }
+
                         1 -> LazyColumn {
                             items(currentMemberList) { member ->
                                 memberElement(member)
                             }
                         }
+
                         2 -> {
                             if (currentRoom != null) {
                                 manageRoomContent(onBack = { currentTab = 0 })
@@ -671,23 +737,62 @@ fun roomScreen(
                 }
             }
 
-            // 底部输入框
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .height(48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp) // 增加组件间距
             ) {
-                TextField(
-                    value = messageInput,
-                    onValueChange = { messageInput = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("输入弹幕...") }
+                val customTextSelectionColors = TextSelectionColors(
+                    handleColor = MaterialTheme.colorScheme.primary,
+                    backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                 )
+                CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
+                    TextField(
+                        value = messageInput,
+                        onValueChange = { messageInput = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .background( // 添加背景色
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .border( // 添加轻微边框
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .padding(horizontal = 16.dp),
+                        placeholder = {
+                            Text(
+                                "输入弹幕...",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                            errorIndicatorColor = Color.Transparent
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                }
+
                 Button(
                     onClick = {
                         if (messageInput.isNotBlank()) {
-                            scope.launch {//保存弹幕信息
+                            scope.launch {
                                 savePlayroomMessage(
                                     context,
                                     PlayroomContent(
@@ -700,37 +805,52 @@ fun roomScreen(
                                             .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))
                                     )
                                 )
-                                // 发送弹幕的点击事件里，补充完整JSONObject构造
                                 try {
                                     val wsComStr = JSONObject().apply {
-                                        put("type", "message") // 弹幕消息类型
-                                        put("r_id", currentRoom.r_id) // 房间ID
-                                        put("from", userInfo.u_id) // 发送者u_id
-                                        put("u_name", userInfo.u_name) // 发送者u_id
-                                        put("content", messageInput)  // 弹幕内容
+                                        put("type", "message")
+                                        put("r_id", currentRoom.r_id)
+                                        put("from", userInfo.u_id)
+                                        put("u_name", userInfo.u_name)
+                                        put("content", messageInput)
                                     }.toString()
                                     playRoomWebSocketManager?.sendMessage(wsComStr)
-                                    Log.d("PlayroomWebSocketManager","本地弹幕信息发送成功！：${wsComStr}")
+                                    Log.d(
+                                        "PlayroomWebSocketManager",
+                                        "本地弹幕信息发送成功！：${wsComStr}"
+                                    )
                                     messageInput = ""
-                                }
-                                catch (e : Exception)
-                                {
-                                    Log.e("PlayroomWebSocketManager","本地弹幕信息发送失败！：${e.message}")
+                                } catch (e: Exception) {
+                                    Log.e(
+                                        "PlayroomWebSocketManager",
+                                        "本地弹幕信息发送失败！：${e.message}"
+                                    )
                                 }
                             }
                         }
                     },
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier
+                        .height(40.dp)
+                        .widthIn(min = 72.dp)
+                        .scale(0.9f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    interactionSource = remember { MutableInteractionSource() }, // 保留这个
                 ) {
-                    Text("发送")
+                    Text(
+                        "发送",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium, // 稍微加粗
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
                 }
             }
-        }
 
+        }
     }
 }
-
-
 @Composable
 fun RequestItem(
     request: RequestDetails,

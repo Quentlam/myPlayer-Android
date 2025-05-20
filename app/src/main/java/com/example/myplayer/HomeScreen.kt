@@ -7,6 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -14,7 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.myplayer.framework.chat.ChatScreen
 import com.example.myplayer.framework.friend.FriendsScreen
 import com.example.myplayer.framework.me.SettingScreen
-import com.example.myplayer.framework.playroom.chosePlayroomScreen
+import com.example.myplayer.framework.playroom.PlayroomNavigation
 
 ////11
 @Composable
@@ -33,8 +35,8 @@ fun HomeScreen(onLogout: () -> Unit) {
                 val currentRoute = currentRoute(navController)
                 items.forEach { item ->
                     NavigationBarItem(
-                        icon = { Icon(item.icon, contentDescription = null) },
-                        label = { Text(item.label) },
+                        icon = { Icon(item.icon, contentDescription = null, modifier = Modifier.size(20.dp)) }, // 缩小图标尺寸
+                        label = { Text(item.label, fontSize = 11.sp) }, // 缩小字体
                         selected = currentRoute == item.route,
                         onClick = {
                             navController.navigate(item.route) {
@@ -56,7 +58,7 @@ fun HomeScreen(onLogout: () -> Unit) {
             composable("friends")  { FriendsScreen() }
             composable("chat")     { ChatScreen() }
             composable("Me")       { SettingScreen(onLogout) }
-            composable("playroom") { chosePlayroomScreen() }
+            composable("playroom") { PlayroomNavigation() }
         }
     }
 }

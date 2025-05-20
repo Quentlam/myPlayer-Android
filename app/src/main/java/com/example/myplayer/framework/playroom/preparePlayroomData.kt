@@ -239,11 +239,8 @@ suspend fun loadAllPlayroom(coroutineScope: CoroutineScope) : Boolean
 
 
 @Composable
-fun playroomListScreen(
-    localNavController : NavHostController
-) {
+fun playroomListScreen(onJoinRoom: (Playroom) -> Unit) {
     val scope = rememberCoroutineScope()
-    var showManageDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -297,19 +294,23 @@ fun playroomListScreen(
                     ),
                     "/inviting/sendinviting"
                 )
-                val response : Response
-                try{
-                    response = request.sendPostRequest(scope)
-                    val data = JsonToBaseResponse<String>(response).getResponseData()
-                    showManageDialog = true
-                    showSearchRoomListDialog = false
-                    Log.d("preparePlayroomData","申请加入房间成功！：${data.msg}")
-                    Toast.makeText(context, "申请加入房间成功！", Toast.LENGTH_SHORT).show()
-                }
-                catch (e : Exception)
-                {
-                    Toast.makeText(context, "申请加入房间失败！", Toast.LENGTH_SHORT).show()
-                    Log.e("preparePlayroomData","申请加入房间失败！：${e.message}")
+                var response : Response? = null
+                scope.launch {
+                    try{
+                        withContext(Dispatchers.IO)
+                        {
+                            response = request.sendPostRequest(scope)
+                            val data = JsonToBaseResponse<String>(response!!).getResponseData()
+                            Log.d("preparePlayroomData","申请加入房间成功！：${data.msg}")
+                        }
+                        showSearchRoomListDialog = false
+                        Toast.makeText(context, "申请加入房间成功！", Toast.LENGTH_SHORT).show()
+                    }
+                    catch (e : Exception)
+                    {
+                        Toast.makeText(context, "申请加入房间失败！", Toast.LENGTH_SHORT).show()
+                        Log.e("preparePlayroomData","申请加入房间失败！：${e.message},${response?.body.toString()}")
+                    }
                 }
             }
         )
@@ -426,11 +427,7 @@ fun playroomListScreen(
                         room.current_url = testUrl2 // 用于测试
                         setPlayroomItem(
                             room = room,
-                            onJoin = {
-                                currentRoom = room
-                                showManageDialog = true
-                                localNavController.navigate("room/${room.r_id}?videoUrl=${room.current_url}")
-                            },
+                            onJoin = { onJoinRoom(room) },
                             onManage = {}
                         )
                     }
@@ -487,6 +484,7 @@ fun AddNewPlayroom(
     onCancel: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     var showErrorDialog by remember { mutableStateOf(false) }
     if (showErrorDialog) {
         AlertDialog(
@@ -582,10 +580,9 @@ fun AddNewPlayroom(
                                 ).sendPostRequest(coroutineScope)
                                 val data = JsonToBaseResponse<String>(response).getResponseData()
                                 Log.i("preparePlayroomData", "创建房间成功！：${data.msg}")
-
+                                Toast.makeText(context, "创建房间成功！", Toast.LENGTH_SHORT).show()
                                 // 创建成功后，重新加载播放室列表
                                 loadAllPlayroom(coroutineScope)
-
                                 // 通知父组件创建成功
                                 withContext(Dispatchers.Main) {
                                     onCreatePlayroom(newPlayroom)
@@ -594,6 +591,7 @@ fun AddNewPlayroom(
                                 withContext(Dispatchers.Main) {
                                     showErrorDialog = true
                                 }
+                                Toast.makeText(context, "创建房间失败！${e.message}", Toast.LENGTH_SHORT).show()
                                 Log.d("preparePlayroomData", e.toString())
                             }
                         }
@@ -633,7 +631,7 @@ suspend fun connectToPlayroomWS(
                 }
             }
         }
-
+        val mainHandler = Handler(Looper.getMainLooper())
         val listener = object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
 
@@ -659,16 +657,25 @@ suspend fun connectToPlayroomWS(
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 super.onOpen(webSocket, response)
                 Log.d("PlayroomWebSocketManager", "房间：${currentRoom.r_id}WebSocket连接成功！")
+                mainHandler.post {
+                    Toast.makeText(context, "连接房间成功！", Toast.LENGTH_SHORT).show()
+                }
                 // 此处可以通知UI或更新状态：连接已建立
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e("PlayroomWebSocketManager", "WebSocket连接失败，准备重连", t)
+                mainHandler.post  {
+                    Toast.makeText(context, "与房间断开连接！准备重连", Toast.LENGTH_SHORT).show()
+                }
                 restartWebSocketWithDelay()
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d("PlayroomWebSocketManager", "WebSocket已关闭，准备重连")
+                mainHandler.post  {
+                    Toast.makeText(context, "房间关闭连接！准备重连", Toast.LENGTH_SHORT).show()
+                }
                 restartWebSocketWithDelay()
             }
 
@@ -677,6 +684,9 @@ suspend fun connectToPlayroomWS(
                     // 3秒后重连，避免频繁重连导致资源浪费或被封禁
                     Handler(Looper.getMainLooper()).postDelayed({
                         Log.d("PlayroomWebSocketManager", "开始重连WebSocket")
+                        mainHandler.post  {
+                            Toast.makeText(context, "开始重连WebSocket", Toast.LENGTH_SHORT).show()
+                        }
                         // 重新调用连接函数
                         coroutineScope.launch {
                             connectToPlayroomWS(
@@ -691,13 +701,20 @@ suspend fun connectToPlayroomWS(
                 catch (e : Exception)
                 {
                     Log.e("PlayroomWebSocketManager", "WebSocket重连失败:${e.message}")
+                    mainHandler.post  {
+                        Toast.makeText(context, "WebSocket重连失败:${e.message}", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
         playRoomWebSocketManager?.connect(listener)
         Log.d("PlayroomWebSocketManager", "尝试连接：wss://www.myplayer.merlin.xin/video?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}&r_id=${currentRoom.r_id}")
+        mainHandler.post  {
+            Toast.makeText(context, "重连房间中！", Toast.LENGTH_SHORT).show()
+        }
     } catch (e: Exception) {
         Log.e("PlayroomWebSocketManager", "连接webSocket失败", e)
+        Toast.makeText(context, "连接房间失败！:${e.message}", Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -790,19 +807,28 @@ fun searchPlayroomsByName(coroutineScope: CoroutineScope,name : String,context: 
         val response = playroomRequest.execute(coroutineScope)
         val gson = Gson()
         val type = object : TypeToken<BaseResponseJsonData<List<Playroom>>>() {}.type
-        val data = gson.fromJson<BaseResponseJsonData<List<Playroom>>>(response.body?.string(), type)
+        val data =
+            gson.fromJson<BaseResponseJsonData<List<Playroom>>>(response.body?.string(), type)
 
         if (data.data != null) {
             Log.d("preparePlayroomData", "搜索播放室成功：${data.data}")
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "搜索播放室成功！", Toast.LENGTH_SHORT).show()
+            }
             emit(data.data)
-        } else if(data.code != 200) {
+        } else if (data.code != 200) {
             Log.e("preparePlayroomData", "搜索播放室失败：${data.msg}")
             Log.e("preparePlayroomData", "搜索播放室失败：${response}")
-            Toast.makeText(context, "搜索失败", Toast.LENGTH_SHORT).show()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "搜索失败", Toast.LENGTH_SHORT).show()
+            }
             emit(emptyList())
         }
+
     } catch (e: Exception) {
         Log.e("preparePlayroomData", "搜索播放室异常：${e.message}")
+        Toast.makeText(context, "搜索播放室异常！：${e.message}", Toast.LENGTH_SHORT).show()
+
         throw e
     }
 }.flowOn(Dispatchers.IO)
