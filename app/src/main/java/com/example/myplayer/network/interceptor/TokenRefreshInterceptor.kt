@@ -3,7 +3,7 @@ package com.example.myplayer.network.interceptor
 import android.util.Log
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
 import com.example.myplayer.model.BaseSentJsonData
-import com.example.myplayer.network.BaseInformation
+import com.example.myplayer.model.BaseInformation
 import com.example.myplayer.network.LoginRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking

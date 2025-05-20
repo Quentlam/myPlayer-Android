@@ -1,6 +1,5 @@
 package com.example.myplayer.framework.playroom
 
-import android.app.VoiceInteractor
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -40,7 +39,6 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,8 +49,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
-import com.example.myplayer.WebSocketManager
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
 import com.example.myplayer.model.BaseResponseJsonData
 import com.example.myplayer.model.BaseSentJsonData
@@ -69,17 +65,15 @@ import com.example.myplayer.model.playroom.Playroom
 import com.example.myplayer.model.playroom.PlayroomContent
 import com.example.myplayer.model.playroom.SynchronousResponseMessage
 import com.example.myplayer.model.playroom.UrlMessage
-import com.example.myplayer.network.BaseInformation
-import com.example.myplayer.network.BaseInformation.currentMemberList
-import com.example.myplayer.network.BaseInformation.currentRequestList
-import com.example.myplayer.network.BaseInformation.currentRoom
-import com.example.myplayer.network.BaseInformation.roomList
-import com.example.myplayer.network.BaseInformation.testUrl2
+import com.example.myplayer.model.BaseInformation.currentMemberList
+import com.example.myplayer.model.BaseInformation.currentRequestList
+import com.example.myplayer.model.BaseInformation.currentRoom
+import com.example.myplayer.model.BaseInformation.roomList
+import com.example.myplayer.model.BaseInformation.testUrl2
 import com.example.myplayer.network.BaseRequest
-import com.example.myplayer.network.DatabaseProvider
+import com.example.myplayer.model.DatabaseProvider
 import com.example.myplayer.network.networkAPI.GetRequest
 import com.example.myplayer.userInfo
-import com.example.myplayer.webSocketManager
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
@@ -94,16 +88,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import okhttp3.internal.http2.Http2Reader
-import org.json.JSONObject
-import java.time.ZoneId
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 
 
 @Composable

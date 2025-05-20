@@ -6,7 +6,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.AudioAttributes
@@ -29,10 +28,6 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import com.example.myplayer.network.BaseInformation.currentRoom
-import com.example.myplayer.userInfo
-import com.example.myplayer.webSocketManager
-import org.json.JSONObject
 
 
 @OptIn(UnstableApi::class)

@@ -1,7 +1,7 @@
 package com.example.myplayer.framework.playroom
 
 import android.util.Log
-import com.example.myplayer.network.BaseInformation
+import com.example.myplayer.model.BaseInformation
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.WebSocket

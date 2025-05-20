@@ -1,5 +1,6 @@
 package com.example.myplayer.network
 
+import com.example.myplayer.model.BaseInformation
 import com.example.myplayer.model.BaseSentJsonData
 import kotlinx.coroutines.CoroutineScope
 import okhttp3.MediaType.Companion.toMediaType
