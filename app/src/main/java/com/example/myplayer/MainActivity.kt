@@ -62,16 +62,15 @@ package com.example.myplayer
         ) {
             composable("login") {
                 LoginScreen(
-//                    onLoginSuccess =       { navController.navigate("login") },
-                    onLoginSuccess =       { },
+                    onLoginSuccess =       { isLoggedIn = true },
                     navController  =         navController,
-                    onLogout = { isLoggedIn = false }
+                    onLogout =             { isLoggedIn = false }
                 )
             }
 
             composable("register") {
                 RegisterScreen(
-                    onNavigateToRegister = { navController.navigate("register") }
+                    onNavigateToLogin = { navController.navigate("Login") }
                 )
             }
 

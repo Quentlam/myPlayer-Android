@@ -43,12 +43,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.privacysandbox.tools.core.model.Type
 import com.example.myplayer.model.BaseInformation.currentRoom
 
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 
 @Composable
 fun PlayroomNavigation(

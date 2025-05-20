@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
-    kotlin("plugin.serialization") version "2.0.0" // 版本根据实际调整
+    kotlin("plugin.serialization")  version "2.0.0"
 }
 
 android {
@@ -16,7 +16,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -39,61 +38,71 @@ android {
     buildFeatures {
         compose = true
     }
-
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.11"
     }
 }
 
 dependencies {
-    implementation("io.coil-kt:coil-compose:2.6.0")
-    implementation("io.coil-kt:coil:2.6.0")
+    // Coil
+    implementation(libs.coil.compose)
+
+    // AndroidX
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+
+    // Compose (由 BOM 统一管理)
     implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.material3)
+    implementation("androidx.compose.material:material-icons-extended")
+    //implementation("androidx.compose.material:material-ui:${libs.versions.roomRuntimeAndroid.get()}")
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
+
+    // Media3
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.exoplayer.dash)
-    implementation(libs.androidx.room.runtime.android)
-    implementation(libs.androidx.espresso.core)
-    implementation(libs.androidx.animation.core.lint)
-    implementation(libs.androidx.tools.core)
+
+
+    val room_version = "2.7.1"
+    // Room
+    implementation("androidx.room:room-runtime:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
+    implementation(libs.androidx.media3.ui)
+    kapt("androidx.room:room-compiler:$room_version")
+
+    // 网络
+    implementation("com.squareup.okhttp3:okhttp:${libs.versions.okhttp.get()}")
+    implementation("com.google.code.gson:gson:${libs.versions.gson.get()}")
+
+    // 其他
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:${libs.versions.coroutines.get()}")
+    implementation("androidx.navigation:navigation-compose:${libs.versions.navigationCompose.get()}")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:${libs.versions.lifecycleRuntimeCompose.get()}")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${libs.versions.serializationJson.get()}")
+    implementation("com.airbnb.android:lottie-compose:${libs.versions.lottieCompose.get()}")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:${libs.versions.swipeRefresh.get()}")
+
+    // 测试
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
+
+    // Debug
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-    implementation("com.squareup.okhttp3:okhttp:4.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.0")
-    implementation("com.google.code.gson:gson:2.10.1")
-    implementation("androidx.navigation:navigation-compose:2.5.3")
-    implementation(libs.coil.compose)
 
+    // 第三方播放器库
+    implementation("com.github.PalankiBharat:ExoPlayerPlus:0.2.0") {
+        exclude(group = "androidx.compose.material3", module = "material3")
+        exclude(group = "androidx.compose.material3", module = "material3-window-size-class")
+    }
 
-    val room_version = "2.7.1" // 或更新版本
-    implementation("androidx.room:room-runtime:$room_version")
-    implementation("androidx.room:room-ktx:$room_version") // 重要！支持协程
-    kapt("androidx.room:room-compiler:$room_version")
-
-
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
-
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-
-//关于图标
-    //implementation("androidx.compose.material3:material3:1.3.2")
-    //implementation("androidx.compose.material3:material3-window-size-class:1.3.2")
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
-    implementation(platform(libs.androidx.compose.bom))
-    implementation("androidx.compose.material3:material3")
-
-    //加载页面图标
-    implementation("com.airbnb.android:lottie-compose:6.0.0")// 请使用最新版本
-
-    implementation("com.github.PalankiBharat:ExoPlayerPlus:0.2.0")
+    
+    //刷新器
+    implementation("androidx.compose.material:material")
 }
