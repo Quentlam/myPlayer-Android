@@ -34,8 +34,8 @@ fun HomeScreen(onLogout: () -> Unit) {
     }
 
     val items = listOf(
-        BottomNavItem("好友", Icons.Default.Person, "friends"),
         BottomNavItem("聊天", Icons.Default.MailOutline, "chat"),
+        BottomNavItem("好友", Icons.Default.Person, "friends"),
         BottomNavItem("播放室", Icons.Default.PlayArrow, "playroom"),
         BottomNavItem("我的", Icons.Default.Person, "Me")
     )
@@ -67,7 +67,7 @@ fun HomeScreen(onLogout: () -> Unit) {
     ) { innerPadding ->
         NavHost(
             navController,
-            startDestination = "friends",
+            startDestination = "chat",
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("friends") { FriendsScreen() }

@@ -28,8 +28,8 @@ class PlayroomWebSocketManager(private val url: String) {
         webSocket = okHttpClient.newWebSocket(request, listener)
     }
 
-    fun sendMessage(message: String) {
-        webSocket?.send(message)
+    fun sendMessage(message: String): Boolean? {
+        return webSocket?.send(message)
     }
 
     fun disconnect() {

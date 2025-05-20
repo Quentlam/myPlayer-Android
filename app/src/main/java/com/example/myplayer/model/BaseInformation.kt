@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.room.Room
+import com.example.myplayer.framework.Dao.ChatMessageDatabase
 import com.example.myplayer.model.playroom.RequestDetails
 import com.example.myplayer.model.playroom.Member
 import com.example.myplayer.model.playroom.Playroom
@@ -38,10 +39,10 @@ object BaseInformation {
 
 object DatabaseProvider {
     @Volatile
-    private var INSTANCE: PlayroomDatabase? = null
+    private var PLAYROOM_INSTANCE: PlayroomDatabase? = null
 
     fun getPlayRoomDatabase(context: Context): PlayroomDatabase {
-        return INSTANCE ?: synchronized(this) {
+        return PLAYROOM_INSTANCE ?: synchronized(this) {
             val instance = Room.databaseBuilder(
                 context.applicationContext,
                 PlayroomDatabase::class.java,
@@ -49,8 +50,26 @@ object DatabaseProvider {
             )
                 .fallbackToDestructiveMigration(true)
                 .build()
-            INSTANCE = instance
+            PLAYROOM_INSTANCE = instance
             instance
         }
     }
+
+    @Volatile
+    private var CHAT_MESSAGE_INSTANCE: ChatMessageDatabase? = null
+
+    fun getChatMessageDatabase(context: Context): ChatMessageDatabase {
+        return CHAT_MESSAGE_INSTANCE ?: synchronized(this) {
+            val instance = Room.databaseBuilder(
+                context.applicationContext,
+                ChatMessageDatabase::class.java,
+                "chatMessage_database"
+            )
+                .fallbackToDestructiveMigration(true)
+                .build()
+            CHAT_MESSAGE_INSTANCE = instance
+            instance
+        }
+    }
+
 }

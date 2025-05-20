@@ -179,7 +179,7 @@ fun getMembers(roomId: String)
 
 
 
-fun getAllPlayrooms(coroutineScope: CoroutineScope): Flow<List<Playroom>> = flow {
+fun getAllPlayrooms(coroutineScope: CoroutineScope,context: Context): Flow<List<Playroom>> = flow {
     try {
         val playroomRequest = GetRequest(
             interfaceName = "/room/getrooms",
@@ -199,15 +199,18 @@ fun getAllPlayrooms(coroutineScope: CoroutineScope): Flow<List<Playroom>> = flow
         }
     } catch (e: Exception) {
         Log.e("Playrooms", "获取播放室列表异常：${e.message}")
+        CoroutineScope(Dispatchers.Main).launch{
+            Toast.makeText(context, "已离线！", Toast.LENGTH_SHORT).show()
+        }
         throw e
     }
 }.flowOn(Dispatchers.IO)
 
-suspend fun loadAllPlayroom(coroutineScope: CoroutineScope) : Boolean
+suspend fun loadAllPlayroom(coroutineScope: CoroutineScope,context: Context) : Boolean
 {
     try {
         withContext(Dispatchers.IO) {
-            getAllPlayrooms(coroutineScope)
+            getAllPlayrooms(coroutineScope, context)
                 .collect { rooms ->
                     withContext(Dispatchers.Main) {
                         roomList = rooms ?: emptyList()
@@ -215,10 +218,12 @@ suspend fun loadAllPlayroom(coroutineScope: CoroutineScope) : Boolean
                 }
         }
         Log.d("preparePlayroomData","加载房间内容成功！:${roomList}")
+        Toast.makeText(context, "加载房间内容成功！", Toast.LENGTH_SHORT).show()
         return false
     } catch (e: Exception) {
         withContext(Dispatchers.Main) {
             Log.e("preparePlayroomData","加载房间内容失败！:${e.message}")
+            Toast.makeText(context, "加载房间内容失败！:${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
     return true
@@ -239,7 +244,7 @@ fun playroomListScreen(onJoinRoom: (Playroom) -> Unit) {
     var filteredRoomList by remember { mutableStateOf(roomList.toList()) }
 
     LaunchedEffect(Unit) {
-        isLoading = loadAllPlayroom(scope)
+        isLoading = loadAllPlayroom(scope,context)
         // 加载后初始化过滤列表为全部
         filteredRoomList = roomList.toList()
     }
@@ -325,7 +330,7 @@ fun playroomListScreen(onJoinRoom: (Playroom) -> Unit) {
                     onCreatePlayroom = { newPlayroom ->
                         scope.launch {
                             isLoading = true
-                            isLoading = loadAllPlayroom(scope)
+                            isLoading = loadAllPlayroom(scope,context)
                             filteredRoomList = roomList.toList() // 刷新过滤列表
                         }
                         showAddPlayroomDialog = false
@@ -393,7 +398,7 @@ fun playroomListScreen(onJoinRoom: (Playroom) -> Unit) {
                             error = null
                             isLoading = true
                             scope.launch {
-                                isLoading = loadAllPlayroom(scope)
+                                isLoading = loadAllPlayroom(scope,context)
                                 filteredRoomList = roomList.toList()
                             }
                         }) {
@@ -569,7 +574,7 @@ fun AddNewPlayroom(
                                 Log.i("preparePlayroomData", "创建房间成功！：${data.msg}")
                                 Toast.makeText(context, "创建房间成功！", Toast.LENGTH_SHORT).show()
                                 // 创建成功后，重新加载播放室列表
-                                loadAllPlayroom(coroutineScope)
+                                loadAllPlayroom(coroutineScope,context)
                                 // 通知父组件创建成功
                                 withContext(Dispatchers.Main) {
                                     onCreatePlayroom(newPlayroom)
@@ -593,111 +598,126 @@ fun AddNewPlayroom(
 }
 
 
-var playRoomWebSocketManager: PlayroomWebSocketManager? = null;
+var playRoomWebSocketManager: PlayroomWebSocketManager? = null
 suspend fun connectToPlayroomWS(
-    roomId: String,
     context: Context,
     coroutineScope: CoroutineScope,
     messageHandler: PlayroomMessageHandler
 ) {
     try {
-        playRoomWebSocketManager = PlayroomWebSocketManager("wss://www.myplayer.merlin.xin/video?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}&r_id=${currentRoom.r_id}")
-        val json = Json {
-            ignoreUnknownKeys = true
-            classDiscriminator = "type" // 与服务端字段对应，不能改
-            isLenient = true
-            serializersModule = SerializersModule {
-                polymorphic(RoomWebSocketMessage::class) {
-                    subclass(JoinMessage::class, JoinMessage.serializer())
-                    subclass(UrlMessage::class, UrlMessage.serializer())
-                    subclass(ReadyMessage::class, ReadyMessage.serializer())
-                    subclass(StartMessage::class, StartMessage.serializer())
-                    subclass(StopMessage::class, StopMessage.serializer())
-                    subclass(SynchronousRequestMessage::class, SynchronousRequestMessage.serializer())
-                    subclass(SynchronousResponseMessage::class, SynchronousResponseMessage.serializer())
-                }
-            }
-        }
-        val mainHandler = Handler(Looper.getMainLooper())
-        val listener = object : WebSocketListener() {
-            override fun onMessage(webSocket: WebSocket, text: String) {
-
-                val msg = try {
-                    json.decodeFromString(RoomWebSocketMessage.serializer(), text)
-                } catch (e: Exception) {
-                    Log.e("PlayroomWebSocketManager", "反序列化消息失败：$text", e)
-                    return
-                }
-
-                when (msg) {
-                    is JoinMessage -> messageHandler.onUserJoined(context,msg)
-                    is UrlMessage -> messageHandler.onUrlReceived(msg)
-                    is ReadyMessage -> messageHandler.onUserReady(msg)
-                    is StartMessage -> messageHandler.onStart(msg)
-                    is StopMessage -> messageHandler.onStop(msg)
-                    is SynchronousRequestMessage -> messageHandler.onSynchronousRequest(msg)
-                    is SynchronousResponseMessage -> messageHandler.onSynchronousResponse(msg)
-                    is Message -> messageHandler.onChatMessage(context,coroutineScope,msg)
-                }
-            }
-
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                super.onOpen(webSocket, response)
-                Log.d("PlayroomWebSocketManager", "房间：${currentRoom.r_id}WebSocket连接成功！")
-                mainHandler.post {
-                    Toast.makeText(context, "连接房间成功！", Toast.LENGTH_SHORT).show()
-                }
-                // 此处可以通知UI或更新状态：连接已建立
-            }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e("PlayroomWebSocketManager", "WebSocket连接失败，准备重连", t)
-                mainHandler.post  {
-                    Toast.makeText(context, "与房间断开连接！准备重连", Toast.LENGTH_SHORT).show()
-                }
-                restartWebSocketWithDelay()
-            }
-
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                Log.d("PlayroomWebSocketManager", "WebSocket已关闭，准备重连")
-                mainHandler.post  {
-                    Toast.makeText(context, "房间关闭连接！准备重连", Toast.LENGTH_SHORT).show()
-                }
-                restartWebSocketWithDelay()
-            }
-
-            private fun restartWebSocketWithDelay() {
-                try {
-                    // 3秒后重连，避免频繁重连导致资源浪费或被封禁
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        Log.d("PlayroomWebSocketManager", "开始重连WebSocket")
-                        mainHandler.post  {
-                            Toast.makeText(context, "开始重连WebSocket", Toast.LENGTH_SHORT).show()
-                        }
-                        // 重新调用连接函数
-                        coroutineScope.launch {
-                            connectToPlayroomWS(
-                                currentRoom.r_id,
-                                context,
-                                coroutineScope,
-                                messageHandler
-                            )
-                        }
-                    }, 3000)
-                }
-                catch (e : Exception)
-                {
-                    Log.e("PlayroomWebSocketManager", "WebSocket重连失败:${e.message}")
-                    mainHandler.post  {
-                        Toast.makeText(context, "WebSocket重连失败:${e.message}", Toast.LENGTH_SHORT).show()
+        withContext(Dispatchers.IO)
+        {
+            playRoomWebSocketManager =
+                PlayroomWebSocketManager("wss://www.myplayer.merlin.xin/video?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}&r_id=${currentRoom.r_id}")
+            val json = Json {
+                ignoreUnknownKeys = true
+                classDiscriminator = "type" // 与服务端字段对应，不能改
+                isLenient = true
+                serializersModule = SerializersModule {
+                    polymorphic(RoomWebSocketMessage::class) {
+                        subclass(JoinMessage::class, JoinMessage.serializer())
+                        subclass(UrlMessage::class, UrlMessage.serializer())
+                        subclass(ReadyMessage::class, ReadyMessage.serializer())
+                        subclass(StartMessage::class, StartMessage.serializer())
+                        subclass(StopMessage::class, StopMessage.serializer())
+                        subclass(
+                            SynchronousRequestMessage::class,
+                            SynchronousRequestMessage.serializer()
+                        )
+                        subclass(
+                            SynchronousResponseMessage::class,
+                            SynchronousResponseMessage.serializer()
+                        )
                     }
                 }
             }
-        }
-        playRoomWebSocketManager?.connect(listener)
-        Log.d("PlayroomWebSocketManager", "尝试连接：wss://www.myplayer.merlin.xin/video?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}&r_id=${currentRoom.r_id}")
-        mainHandler.post  {
-            Toast.makeText(context, "重连房间中！", Toast.LENGTH_SHORT).show()
+            val mainHandler = Handler(Looper.getMainLooper())
+            val listener = object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+
+                    val msg = try {
+                        json.decodeFromString(RoomWebSocketMessage.serializer(), text)
+                    } catch (e: Exception) {
+                        Log.e("PlayroomWebSocketManager", "反序列化消息失败：$text", e)
+                        return
+                    }
+
+                    when (msg) {
+                        is JoinMessage -> messageHandler.onUserJoined(context, msg)
+                        is UrlMessage -> messageHandler.onUrlReceived(msg)
+                        is ReadyMessage -> messageHandler.onUserReady(msg)
+                        is StartMessage -> messageHandler.onStart(msg)
+                        is StopMessage -> messageHandler.onStop(msg)
+                        is SynchronousRequestMessage -> messageHandler.onSynchronousRequest(msg)
+                        is SynchronousResponseMessage -> messageHandler.onSynchronousResponse(msg)
+                        is Message -> messageHandler.onChatMessage(context, coroutineScope, msg)
+                    }
+                }
+
+                override fun onOpen(webSocket: WebSocket, response: Response) {
+                    super.onOpen(webSocket, response)
+                    Log.d("PlayroomWebSocketManager", "房间：${currentRoom.r_id}WebSocket连接成功！")
+                    mainHandler.post {
+                        Toast.makeText(context, "连接房间成功！", Toast.LENGTH_SHORT).show()
+                    }
+                    // 此处可以通知UI或更新状态：连接已建立
+                }
+
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    Log.e("PlayroomWebSocketManager", "WebSocket连接失败，准备重连", t)
+                    mainHandler.post {
+                        Toast.makeText(context, "与房间断开连接！准备重连", Toast.LENGTH_SHORT)
+                            .show()
+                    }
+                    restartWebSocketWithDelay()
+                }
+
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                    Log.d("PlayroomWebSocketManager", "WebSocket已关闭，准备重连")
+                    mainHandler.post {
+                        Toast.makeText(context, "房间关闭连接！准备重连", Toast.LENGTH_SHORT).show()
+                    }
+                    restartWebSocketWithDelay()
+                }
+
+                private fun restartWebSocketWithDelay() {
+                    try {
+                        // 3秒后重连，避免频繁重连导致资源浪费或被封禁
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            Log.d("PlayroomWebSocketManager", "开始重连WebSocket")
+                            mainHandler.post {
+                                Toast.makeText(context, "开始重连WebSocket", Toast.LENGTH_SHORT)
+                                    .show()
+                            }
+                            // 重新调用连接函数
+                            coroutineScope.launch {
+                                connectToPlayroomWS(
+                                    context,
+                                    coroutineScope,
+                                    messageHandler
+                                )
+                            }
+                        }, 3000)
+                    } catch (e: Exception) {
+                        Log.e("PlayroomWebSocketManager", "WebSocket重连失败:${e.message}")
+                        mainHandler.post {
+                            Toast.makeText(
+                                context,
+                                "WebSocket重连失败:${e.message}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            }
+            playRoomWebSocketManager?.connect(listener)
+            Log.d(
+                "PlayroomWebSocketManager",
+                "尝试连接：wss://www.myplayer.merlin.xin/video?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}&r_id=${currentRoom.r_id}"
+            )
+            mainHandler.post {
+                Toast.makeText(context, "重连房间中！", Toast.LENGTH_SHORT).show()
+            }
         }
     } catch (e: Exception) {
         Log.e("PlayroomWebSocketManager", "连接webSocket失败", e)

@@ -32,8 +32,15 @@ class WebSocketManager(private val url: String) {
         webSocket = okHttpClient.newWebSocket(request, listener)
     }
 
-    fun sendMessage(message: String) {
-        webSocket?.send(message)
+    fun sendMessage(message: String): Boolean? {
+        try{
+            return webSocket?.send(message)
+        }
+        catch (e:Exception) {
+            Log.e("WebSocketManager","信息发送失败！${e.message}")
+            return false
+        }
+        return false
     }
 
     fun disconnect(onLogout: () -> Unit) {
@@ -49,19 +56,4 @@ class WebSocketManager(private val url: String) {
         }
         Log.i(TAG, "退出登录${state}")
     }
-    private var reconnectAttempts = 0
-    private val maxReconnectAttempts = 5
-    private val baseReconnectDelay = 1000L // 1秒
-
-    fun scheduleReconnect(listener: WebSocketListener) {
-        if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts++
-            val delay = baseReconnectDelay * reconnectAttempts
-            CoroutineScope(Dispatchers.IO).launch {
-                delay(delay)
-                connect(listener)
-            }
-        }
-    }
-
 }

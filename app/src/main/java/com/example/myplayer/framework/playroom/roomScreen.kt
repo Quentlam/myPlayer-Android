@@ -643,7 +643,6 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
             withContext(Dispatchers.IO)
             {
                 connectToPlayroomWS(
-                    roomId = currentRoom.r_id,
                     context = context,
                     coroutineScope = scope,
                     messageHandler = messageHandler
@@ -808,18 +807,6 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                     onClick = {
                         if (messageInput.isNotBlank()) {
                             scope.launch {
-                                savePlayroomMessage(
-                                    context,
-                                    PlayroomContent(
-                                        0,
-                                        currentRoom.r_id,
-                                        userInfo.u_id,
-                                        userInfo.u_name,
-                                        messageInput,
-                                        ZonedDateTime.now(ZoneId.of("Asia/Shanghai"))
-                                            .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))
-                                    )
-                                )
                                 try {
                                     val wsComStr = JSONObject().apply {
                                         put("type", "message")
@@ -832,6 +819,18 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                                     Log.d(
                                         "PlayroomWebSocketManager",
                                         "本地弹幕信息发送成功！：${wsComStr}"
+                                    )
+                                    savePlayroomMessage(
+                                        context,
+                                        PlayroomContent(
+                                            0,
+                                            currentRoom.r_id,
+                                            userInfo.u_id,
+                                            userInfo.u_name,
+                                            messageInput,
+                                            ZonedDateTime.now(ZoneId.of("Asia/Shanghai"))
+                                                .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))
+                                        )
                                     )
                                     messageInput = ""
                                 } catch (e: Exception) {

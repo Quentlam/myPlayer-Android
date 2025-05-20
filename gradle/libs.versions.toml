@@ -1,6 +1,6 @@
 [versions]
 agp = "8.8.0"
-coilCompose = "2.2.2"
+coilCompose = "2.6.0"  # 更新为实际使用的版本
 kotlin = "2.0.0"
 coreKtx = "1.15.0"
 junit = "4.13.2"
@@ -8,16 +8,19 @@ junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.10.1"
-composeBom = "2023.10.01"
-media3Ui = "1.6.1"
-media3CommonKtx = "1.6.1"
-media3Exoplayer = "1.6.1"
+composeBom = "2023.05.01"
 media3ExoplayerHls = "1.6.1"
 media3ExoplayerDash = "1.6.1"
 roomRuntimeAndroid = "2.7.1"
-media3UiVersion = "1.1.0"
-animationCoreLint = "1.8.1"
-toolsCore = "1.0.0-alpha13"
+okhttp = "4.12.0"
+gson = "2.10.1"
+coroutines = "1.7.3"
+navigationCompose = "2.7.7"
+lifecycleRuntimeCompose = "2.7.0"
+serializationJson = "1.6.0"
+lottieCompose = "6.4.0"
+swipeRefresh = "1.1.0"
+media3Ui = "1.7.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -36,9 +39,10 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3ExoplayerHls" }
 androidx-media3-exoplayer-dash = { group = "androidx.media3", name = "media3-exoplayer-dash", version.ref = "media3ExoplayerDash" }
-androidx-room-runtime-android = { group = "androidx.room", name = "room-runtime-android", version.ref = "roomRuntimeAndroid" }
-androidx-animation-core-lint = { group = "androidx.compose.animation", name = "animation-core-lint", version.ref = "animationCoreLint" }
-androidx-tools-core = { group = "androidx.privacysandbox.tools", name = "tools-core", version.ref = "toolsCore" }
+androidx-material3 = { group = "androidx.compose.material3",  name = "material3" }
+androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3Ui" }
+
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
