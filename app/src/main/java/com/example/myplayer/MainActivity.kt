@@ -30,6 +30,7 @@ package com.example.myplayer
     import com.example.myplayer.model.BaseInformation
     import com.example.myplayer.network.LoginRequest
     import com.example.myplayer.ui.theme.MyPlayerTheme
+    import com.palankibharat.exo_compose_player.PipInitializer
     import kotlinx.coroutines.launch
     import okio.IOException
     import kotlinx.coroutines.Dispatchers
@@ -43,6 +44,7 @@ package com.example.myplayer
             enableEdgeToEdge()
             setContent {
                 MyPlayerTheme {
+                    PipInitializer(this).initialize()
                     AppNavigation()
                 }
             }
