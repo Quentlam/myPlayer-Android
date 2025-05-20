@@ -1,9 +1,7 @@
 package com.example.myplayer.framework.playroom
 
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -36,35 +33,31 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.myplayer.model.BaseResponseJsonData
-import com.example.myplayer.model.playroom.Playroom
-import com.example.myplayer.network.networkAPI.GetRequest
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.example.myplayer.network.BaseInformation.currentRoom
 
 
 @Composable
-fun chosePlayroomScreen() {
-    val localNavController = rememberNavController()
+fun PlayroomNavigation() {
+    val navController = rememberNavController()
+
     NavHost(
-        navController = localNavController,
+        navController = navController,
         startDestination = "playroomList"
     ) {
         composable("playroomList") {
-            Column {
-                playroomListScreen(localNavController)
-            }
+            playroomListScreen(
+                onJoinRoom = { room ->
+                    currentRoom = room
+                    navController.navigate("roomScreen/${room.r_id}")
+                }
+            )
         }
-        composable("room/{roomId}") {
-            backStackEntry ->
-            roomScreen(localNavController)
+        composable("roomScreen/{roomId}") { backStackEntry ->
+                roomScreen(
+                    room = currentRoom,
+                    onBack = { navController.navigateUp() }
+                )
         }
     }
 }

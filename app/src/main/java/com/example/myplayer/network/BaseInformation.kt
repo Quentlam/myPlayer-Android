@@ -4,10 +4,12 @@ import com.example.myplayer.framework.Dao.PlayroomDatabase
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.room.Room
 import com.example.myplayer.framework.playroom.PlayroomMessageHandler
 import com.example.myplayer.framework.playroom.PlayroomWebSocketManager
+import com.example.myplayer.model.playroom.Inviting
 import com.example.myplayer.model.playroom.RequestDetails
 import com.example.myplayer.model.playroom.Member
 import com.example.myplayer.model.playroom.Playroom
@@ -32,8 +34,8 @@ object BaseInformation {
     )
     var testUrl2 = "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
     var testUrl1 = "http://10.60.13.48:9990/Broken Soul Clown 3.mp4"
-    var currentMemberList = emptyList<Member>()
-    var currentRequestList = emptyList<RequestDetails>()
+    var currentMemberList by mutableStateOf<List<Member>>(emptyList())
+    var currentRequestList by mutableStateOf<List<RequestDetails>>(emptyList())
 }
 
 

@@ -4,6 +4,10 @@ import SHA256Util
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,16 +31,32 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.window.Dialog
+import androidx.lint.kotlin.metadata.Visibility
 import com.example.myplayer.framework.chat.ChatMessage
 import com.example.myplayer.framework.chat.chatMessagesMap
 import com.example.myplayer.model.WebSocketResponse
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.window.DialogProperties
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.airbnb.lottie.compose.*
+
 
 private val TAG = "LoginScreen"
 
@@ -45,18 +65,26 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     navController: NavHostController,
     onLogout: () -> Unit
-    ) {
-    var account by remember { mutableStateOf("qkliangfeng@qq.com") } //1959804282
+) {
+    var account by remember { mutableStateOf("qkliangfeng@qq.com") }
     var password by remember { mutableStateOf("123456") }
     var isRegister by remember { mutableStateOf(false) }
     var showErrorDialog by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val friendCoroutineScope = rememberCoroutineScope()
+    val userInfoCoroutineScope = rememberCoroutineScope()
+    var errorMessage by remember { mutableStateOf("") }
+
+
 
     if (showErrorDialog) {
         AlertDialog(
             onDismissRequest = { showErrorDialog = false },
             title = { Text("提示") },
-            text = { Text("登录失败") },
+            text = { Text(errorMessage) },
             confirmButton = {
                 TextButton(onClick = { showErrorDialog = false }) {
                     Text("确定")
@@ -65,153 +93,314 @@ fun LoginScreen(
         )
     }
 
-    val coroutineScope = rememberCoroutineScope()
-
-    if(!isRegister) {
-        Column(
+    if (!isRegister) {
+        // 背景渐变色，您可以换成自己喜欢的颜色或图片
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .background(Color(0xFFFFFFFF))
+                .padding(16.dp)
         ) {
-            TextField(
-                value = account,
-                onValueChange = { account = it },
-                label = { Text("账号") },
-                modifier = Modifier.fillMaxWidth()
-            )
+            // 可滚动支持，防止软键盘遮挡问题
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val customTextSelectionColors = TextSelectionColors(
+                    handleColor = MaterialTheme.colorScheme.primary,
+                    backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "欢迎登录",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
 
-            TextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("密码") },
-                modifier = Modifier.fillMaxWidth()
-            )
+                OutlinedTextField(
+                    value = account,
+                    onValueChange = { account = it },
+                    label = { Text("账号") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "账号图标"
+                        )
+                    },
+                    enabled = !loading,
+                    colors = TextFieldDefaults.colors(
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
 
-            Spacer(modifier = Modifier.height(24.dp))
+                        Color.White,
+                        Color.White,
+                        Color.White,
 
-            Button(
-                onClick = {
-                    coroutineScope.launch {
-                        withContext(Dispatchers.IO) {
-                            try {
-                                val response =
-                                    LoginRequest(
+                        Color.White,
+                        MaterialTheme.colorScheme.primary,
+                        Color.White.copy(alpha = 0.5f),
+
+                        MaterialTheme.colorScheme.primary,
+                        Color.White.copy(alpha = 0.7f),
+                        customTextSelectionColors,
+
+                        MaterialTheme.colorScheme.primary,
+                        Color.White.copy(alpha = 0.7f),
+                        Color.White.copy(alpha = 0.38f),
+                        )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("密码") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "密码图标"
+                        )
+                    },
+                    trailingIcon = {
+                        val image = if (passwordVisible)
+                            Icons.Default.Visibility
+                        else
+                            Icons.Default.VisibilityOff
+
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(imageVector = image, contentDescription = "切换密码可见")
+                        }
+                    },
+                    enabled = !loading,
+                    colors = TextFieldDefaults.colors(
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+
+                        Color.White,
+                        Color.White,
+                        Color.White,
+
+                        Color.White,
+                        MaterialTheme.colorScheme.primary,
+                        Color.White.copy(alpha = 0.5f),
+
+                        MaterialTheme.colorScheme.primary,
+                        Color.White.copy(alpha = 0.7f),
+                        customTextSelectionColors,
+
+                        MaterialTheme.colorScheme.primary,
+                        Color.White.copy(alpha = 0.7f),
+                        Color.White.copy(alpha = 0.38f),
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Button(
+                    onClick = {
+                        loading = true
+                        coroutineScope.launch {
+                            withContext(Dispatchers.IO) {
+                                try {
+                                    val response = LoginRequest(
                                         listOf(
                                             BaseSentJsonData("u_account", account),
                                             BaseSentJsonData(
                                                 "u_password",
                                                 SHA256Util.sha256Encrypt(password)
                                             )
-                                        ),
-                                        "/login"
+                                        ), "/login"
                                     ).sendRequest(coroutineScope)
-                                val data = JsonToBaseResponse<String>(response).getResponseData()
-                                // 在主线程中更新 UI 状态
-                                // 修改后登录逻辑：
-                                    onLoginSuccess()
-                                    BaseInformation.account = account
-                                    BaseInformation.password = SHA256Util.sha256Encrypt(password)
-                                    BaseInformation.token = data.data.toString()
-                                    Log.i("loginScreen", data.toString())
-                                    Log.i("loginScreen-token", BaseInformation.token)
 
-                                    getUserInfo(coroutineScope)
-                                    getFriendList(coroutineScope)
+                                    val data = JsonToBaseResponse<String>(response).getResponseData()
+
+                                    withContext(Dispatchers.Main) {
+                                        loading = false
+                                        onLoginSuccess()
+                                        BaseInformation.account = account
+                                        BaseInformation.password = SHA256Util.sha256Encrypt(password)
+                                        BaseInformation.token = data.data.toString()
+                                        Log.i("loginScreen", data.toString())
+                                        Log.i("loginScreen-token", BaseInformation.token)
+                                    }
+
+                                    getUserInfo(friendCoroutineScope)
+                                    getFriendList(userInfoCoroutineScope)
                                     connectToWS(onLogout)
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        loading = false
+                                        errorMessage = when (e) {
+                                            is java.io.IOException,
+                                            is java.net.SocketTimeoutException,
+                                            is java.net.UnknownHostException -> "网络异常，请检查网络连接"
+                                            else -> "登录失败，请检查账号或密码"
+                                        }
+                                        showErrorDialog = true
+                                    }
+                                    Log.d("loginScreen", e.toString())
+                                }
                             }
-                            catch (e: Exception)
-                            {
-                                showErrorDialog = true
-                                Log.d("loginScreen", e.toString())
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    enabled = !loading,
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Text(
+                        text = if (loading) "登录中..." else "登录",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextButton(
+                    onClick = { isRegister = true },
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "没有账号？立即注册",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            if (loading) {
+                Dialog(
+                    onDismissRequest = { /* 禁止关闭 */ },
+                    properties = DialogProperties(
+                        dismissOnBackPress = false,
+                        dismissOnClickOutside = false
+                    )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 16.dp,
+                            shadowElevation = 8.dp,
+                            modifier = Modifier.size(150.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                // 加载Lottie动画资源
+                                val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.loading_animation))
+                                val progress by animateLottieCompositionAsState(
+                                    composition,
+                                    iterations = LottieConstants.IterateForever
+                                )
+
+                                LottieAnimation(
+                                    composition = composition,
+                                    progress = progress,
+                                    modifier = Modifier.size(80.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(20.dp))
+
+                                Text(
+                                    text = "登录中...",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("登录")
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = { isRegister = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Transparent),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(
-                    text = "注册",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
         }
-    }
-    else
-    {
+    } else {
         navController.navigate("register")
     }
-
 }
 
-suspend fun getUserInfo(coroutineScope: CoroutineScope){
-    try {
-        val request = GetRequest(
-            interfaceName = "/user/getuserinfo",
-            queryParams = mapOf()
-        )
-        val response = request.execute(coroutineScope)
-        val gson = Gson()
-        val type = object : TypeToken<BaseResponseJsonData<UserInfo>>() {}.type
-        val data = gson.fromJson<BaseResponseJsonData<UserInfo>>(response.body?.string(), type)
 
-        if (data != null && data.data != null) {
-            Log.d("LoginScreen", "获取用户信息成功：${data.data}")
-            Log.d("LoginScreen", "u_name: ${data.data.u_name}")
+suspend fun getUserInfo(coroutineScope: CoroutineScope) {
+    withContext(Dispatchers.IO) {
+        try {
+            val request = GetRequest(
+                interfaceName = "/user/getuserinfo",
+                queryParams = mapOf()
+            )
+            val response = request.execute(coroutineScope)
+            val gson = Gson()
+            val type = object : TypeToken<BaseResponseJsonData<UserInfo>>() {}.type
+            val data = gson.fromJson<BaseResponseJsonData<UserInfo>>(response.body?.string(), type)
 
-            userInfo.u_name = data.data.u_name
-            userInfo.u_introduction = data.data.u_introduction
-            userInfo.u_avatar = data.data.u_avatar
-            userInfo.u_id = data.data.u_id
+            if (data != null && data.data != null) {
+                Log.d("LoginScreen", "获取用户信息成功：${data.data}")
+                Log.d("LoginScreen", "u_name: ${data.data.u_name}")
 
-        } else {
-            Log.e("LoginScreen", "获取用户信息失败：${data.msg}")
+                userInfo.u_name = data.data.u_name
+                userInfo.u_introduction = data.data.u_introduction
+                userInfo.u_avatar = data.data.u_avatar
+                userInfo.u_id = data.data.u_id
+
+            } else {
+                Log.e("LoginScreen", "获取用户信息失败：${data.msg}")
+            }
+        } catch (e: Exception) {
+            Log.e("LoginScreen", "获取用户信息异常：${e.message}")
+            throw e
         }
-    } catch (e: Exception) {
-        Log.e("LoginScreen", "获取用户信息异常：${e.message}")
-        throw e
     }
 }
-suspend fun getFriendList(coroutineScope: CoroutineScope){
-    try {
-        val response = GetRequest(
-            interfaceName = "/friend/getfriends",
-            queryParams = mapOf()
-        ).execute(coroutineScope)
-        val type = object : TypeToken<BaseResponseJsonData<List<UserInfo>>>() {}.type
-        val data = Gson().fromJson<BaseResponseJsonData<List<UserInfo>>>(response.body?.string(), type)
 
-        if (data != null && data.data != null) {
-            userInfo.friendList = data.data.also {
-                Log.d(com.example.myplayer.framework.chat.TAG, "好友列表更新：${it.size}条记录")
+suspend fun getFriendList(coroutineScope: CoroutineScope){
+    withContext(Dispatchers.IO) {
+        try {
+            val response = GetRequest(
+                interfaceName = "/friend/getfriends",
+                queryParams = mapOf()
+            ).execute(coroutineScope)
+            val type = object : TypeToken<BaseResponseJsonData<List<UserInfo>>>() {}.type
+            val data =
+                Gson().fromJson<BaseResponseJsonData<List<UserInfo>>>(response.body?.string(), type)
+
+            if (data != null && data.data != null) {
+                userInfo.friendList = data.data.also {
+                    Log.d(com.example.myplayer.framework.chat.TAG, "好友列表更新：${it.size}条记录")
+                }
+                Log.d(
+                    com.example.myplayer.framework.chat.TAG, "好友列表详情：\n${
+                        userInfo.friendList?.joinToString("\n") {
+                            "好友ID：${it.u_id} 姓名：${it.u_name} 头像：${it.u_avatar}"
+                        } ?: "空列表"
+                    }")
+            } else {
+                Log.e(com.example.myplayer.framework.chat.TAG, "获取好友列表失败：${data.msg}")
             }
-            Log.d(com.example.myplayer.framework.chat.TAG, "好友列表详情：\n${userInfo.friendList?.joinToString("\n") {
-                "好友ID：${it.u_id} 姓名：${it.u_name} 头像：${it.u_avatar}"
-            } ?: "空列表"}")
-        } else {
-            Log.e(com.example.myplayer.framework.chat.TAG, "获取好友列表失败：${data.msg}")
+        } catch (e: Exception) {
+            Log.e(com.example.myplayer.framework.chat.TAG, "获取好友列表异常：${e.message}")
+            throw e
         }
-    } catch (e: Exception) {
-        Log.e(com.example.myplayer.framework.chat.TAG, "获取好友列表异常：${e.message}")
-        throw e
     }
 }
 var webSocketManager: WebSocketManager? = null;
