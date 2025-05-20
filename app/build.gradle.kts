@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.myplayer"
-        minSdk = 33
+        minSdk = 34
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -39,8 +39,9 @@ android {
     buildFeatures {
         compose = true
     }
+
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
+        kotlinCompilerExtensionVersion = "1.5.1"
     }
 }
 
@@ -59,6 +60,7 @@ dependencies {
     implementation(libs.androidx.room.runtime.android)
     implementation(libs.androidx.espresso.core)
     implementation(libs.androidx.animation.core.lint)
+    implementation(libs.androidx.tools.core)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -81,28 +83,17 @@ dependencies {
 
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    //播放器相关依赖
-    val media3_version = "1.6.1"
-
-    implementation("androidx.media3:media3-exoplayer:$media3_version")
-    implementation("androidx.media3:media3-extractor:$media3_version")
-    implementation("androidx.media3:media3-ui:$media3_version")
-    implementation("androidx.media3:media3-common:$media3_version")
-    implementation("androidx.media3:media3-common-ktx:$media3_version")
-    implementation("androidx.media3:media3-ui-compose:$media3_version")
-
-// 网络层（推荐 OkHttp）
-    implementation("androidx.media3:media3-datasource-okhttp:$media3_version")
-
-
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
 //关于图标
-    implementation("androidx.compose.material3:material3:1.3.2")
-    implementation("androidx.compose.material3:material3-window-size-class:1.3.2")
+    //implementation("androidx.compose.material3:material3:1.3.2")
+    //implementation("androidx.compose.material3:material3-window-size-class:1.3.2")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
-
+    implementation(platform(libs.androidx.compose.bom))
+    implementation("androidx.compose.material3:material3")
 
     //加载页面图标
     implementation("com.airbnb.android:lottie-compose:6.0.0")// 请使用最新版本
+
+    implementation("com.github.PalankiBharat:ExoPlayerPlus:0.2.0")
 }

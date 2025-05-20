@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -54,7 +55,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
-import com.example.myplayer.framework.playroom.player.exoPlayerView
 import com.example.myplayer.model.playroom.JoinMessage
 import com.example.myplayer.model.playroom.Member
 import com.example.myplayer.model.playroom.Message
@@ -65,6 +65,7 @@ import com.example.myplayer.model.playroom.StopMessage
 import com.example.myplayer.model.playroom.SynchronousRequestMessage
 import com.example.myplayer.model.playroom.SynchronousResponseMessage
 import com.example.myplayer.model.playroom.UrlMessage
+import com.palankibharat.exo_compose_player.ExoComposePlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import org.json.JSONObject
@@ -193,7 +194,8 @@ val messageHandler = object : PlayroomMessageHandler {
 
 @Composable
 fun manageRoomContent(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onReloadVideo : () -> Unit,
 ) {
     var showInvitationDialog by remember { mutableStateOf(false) }
     var showRoomSetting by remember { mutableStateOf(false) }
@@ -494,6 +496,7 @@ fun manageRoomContent(
                         maxLines = 2,  // 限制行数
                         overflow = TextOverflow.Ellipsis  // 超出部分显示省略号
                     )
+
                 }
 
                 // 头像放在右侧，尺寸更小
@@ -508,11 +511,19 @@ fun manageRoomContent(
                 )
             }
         }
-
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            item {
+                // “刷新视频”管理项
+                ManagementItem(
+                    icon = Icons.Default.Refresh,
+                    title = "刷新视频",
+                    subtitle = "重新加载当前视频流",
+                    onClick = { onReloadVideo() }
+                )
+            }
             item {
                 ManagementItem(
                     icon = Icons.Default.Notifications,
@@ -606,6 +617,7 @@ private fun ManagementItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun roomScreen(room : Playroom,onBack: () -> Unit) {
     Log.d(
@@ -619,6 +631,7 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
     val messageList by getPlayroomMessage(context, currentRoom.r_id)
         .collectAsStateWithLifecycle(initialValue = emptyList())//直接获取Flow并且转换为Status
     var startPositionMs by remember { mutableStateOf(0L) }
+    var reloadTrigger by remember { mutableStateOf(0) }//刷新视频
 
 
     // 添加 LazyListState 来控制滚动
@@ -627,12 +640,15 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
     DisposableEffect(Unit) {
         // 进入roomScreen，启动连接
         scope.launch {
-            connectToPlayroomWS(
-                roomId = currentRoom.r_id,
-                context = context,
-                coroutineScope = scope,
-                messageHandler = messageHandler
-            )
+            withContext(Dispatchers.IO)
+            {
+                connectToPlayroomWS(
+                    roomId = currentRoom.r_id,
+                    context = context,
+                    coroutineScope = scope,
+                    messageHandler = messageHandler
+                )
+            }
         }
         onDispose {
             // 离开roomScreen，断开WebSocket
@@ -665,11 +681,9 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                     .aspectRatio(16f / 9f)  // 使用16:9的视频比例
             ) {
                 currentRoom.current_url?.let {
-                    exoPlayerView(
-                        context = LocalContext.current,
-                        videoUrl = it,
-                        startPositionMs = startPositionMs,
-                        lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                    ExoComposePlayer(
+                        modifier = Modifier.fillMaxWidth().aspectRatio(16f/9f),
+                        mediaUrl = it
                     )
                 }
             }
@@ -717,7 +731,13 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
 
                         2 -> {
                             if (currentRoom != null) {
-                                manageRoomContent(onBack = { currentTab = 0 })
+                                manageRoomContent(
+                                    onBack = { currentTab = 0 },
+                                    onReloadVideo = {
+                                        Toast.makeText(context, "正在重新加载视频", Toast.LENGTH_SHORT).show()
+                                        reloadTrigger++
+                                    }
+                                )
                             } else {
                                 // 显示错误状态
                                 Box(
@@ -846,6 +866,9 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
         }
     }
 }
+
+
+
 @Composable
 fun RequestItem(
     request: RequestDetails,
@@ -1004,4 +1027,5 @@ suspend fun uploadImageAndGetUrl(uri: Uri): String {//待定，因为服务器�
     delay(1000) // 模拟网络上传延迟
     return "https://123.png"
 }
+
 

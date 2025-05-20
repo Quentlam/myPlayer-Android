@@ -1,250 +1,374 @@
-package com.example.myplayer.framework.playroom.player
-
-import android.content.Context
-import android.media.AudioManager
-import android.util.Log
-import android.widget.Toast
-import androidx.annotation.OptIn
-import androidx.compose.runtime.*
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.LifecycleOwner
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.common.Tracks
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.exoplayer.dash.DashMediaSource
-import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
-
-
-
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-
-
-@OptIn(UnstableApi::class)
-@Composable
-fun exoPlayerView(
-    context: Context,
-    videoUrl: String,
-    startPositionMs: Long = 0L,  // 新增参数，默认0
-    lifecycleOwner: LifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-) {
-    // 用于触发重新加载的状态变量，每次+1时触发播放器重载
-    var reloadTrigger by remember { mutableStateOf(0) }
-
-    Column {
-        // 重新加载按钮
-        Button(onClick = { reloadTrigger++ }) {
-            Text("重新加载视频")
-        }
-
-        // 播放器视图容器，监听 reloadTrigger 变化重载
-        PlayerViewContainer(context = context, videoUrl = videoUrl, reloadTrigger = reloadTrigger,startPositionMs = startPositionMs,lifecycleOwner = lifecycleOwner)
-    }
-}
-
-@OptIn(UnstableApi::class)
-@Composable
-private fun PlayerViewContainer(
-    context: Context,
-    videoUrl: String,
-    reloadTrigger: Int,
-    startPositionMs: Long = 0L,  // 新增参数，默认0
-    lifecycleOwner: LifecycleOwner
-) {
-    if (videoUrl.isEmpty()) {
-        Toast.makeText(context, "无效的视频地址", Toast.LENGTH_SHORT).show()
-        return
-    }
-
-    val audioManager = remember {
-        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    }
-
-    val audioAttributes = AudioAttributes.Builder()
-        .setUsage(C.USAGE_MEDIA)
-        .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-        .build()
-
-    val exoPlayer = remember(context) {
-        ExoPlayer.Builder(context)
-            .build()
-            .apply {
-                setAudioAttributes(audioAttributes, /* handleAudioFocus= */true)
-                volume = 1.0f
-                playWhenReady = false // 先不播放，准备好后再启动
-                addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        when (playbackState) {
-                            Player.STATE_READY -> {
-                                Log.d("PlayerState", "播放器准备就绪并开始播放")
-                                Log.d("Audio", "音频会话ID: $audioSessionId")
-                                Log.d("Audio", "音频格式: $audioFormat")
-                            }
-                        }
-                    }
-
-                    override fun onPlayerError(error: PlaybackException) {
-                        when (error.errorCode) {
-                            PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
-                                Toast.makeText(context, "找不到视频文件", Toast.LENGTH_SHORT).show()
-                            PlaybackException.ERROR_CODE_IO_UNSPECIFIED ->
-                                Toast.makeText(context, "播放出错：IO错误", Toast.LENGTH_SHORT).show()
-                            PlaybackException.ERROR_CODE_UNSPECIFIED ->
-                                Toast.makeText(context, "播放出错：未知错误", Toast.LENGTH_SHORT).show()
-                            else ->
-                                Toast.makeText(context, "播放出错：${error.message}", Toast.LENGTH_SHORT).show()
-                        }
-                        Log.e("PlayerError", "Error code: ${error.errorCode}, message: ${error.message}")
-                    }
-
-                    override fun onTracksChanged(tracks: Tracks) {
-                        Log.d("Tracks", "Tracks changed: $tracks")
-                        for ((groupIndex, group) in tracks.groups.withIndex()) {
-                            if (group.type == C.TRACK_TYPE_AUDIO && group.length > 0) {
-                                val format = group.getTrackFormat(0)
-                                Log.d("TrackSelection", "音频轨道: index=$groupIndex, language=${format.language}, mime=${format.sampleMimeType}")
-
-                                val override = TrackSelectionOverride(group.mediaTrackGroup, listOf(0))
-
-                                val newParams = this@apply.trackSelectionParameters
-                                    .buildUpon()
-                                    .setOverrideForType(override)
-                                    .build()
-
-                                this@apply.trackSelectionParameters = newParams
-                                Log.d("TrackSelection", "强制选择音轨 $groupIndex")
-                                break
-                            }
-                        }
-                    }
-
-                    override fun onPositionDiscontinuity(
-                        oldPosition: Player.PositionInfo,
-                        newPosition: Player.PositionInfo,
-                        reason: Int
-                    ) {
-                        super.onPositionDiscontinuity(oldPosition, newPosition, reason)
-
-                        val oldPosMs = oldPosition.positionMs
-                        val newPosMs = newPosition.positionMs
-
-                        Log.d("exoPlayerWS", "播放位置跳变，旧位置: $oldPosMs ms， 新位置: $newPosMs ms，原因: $reason")
-
-                        when (reason) {
-                            Player.DISCONTINUITY_REASON_SEEK -> {
-                                Log.d("exoPlayerWS", "跳变原因：Seek跳转")
-//                                try {//这里待定，因为服务器那边还没有同步的消息体
-//                                    val wsComStr = JSONObject().apply {
-//                                        put("type", "url") // 弹幕消息类型
-//                                        put("r_id", currentRoom.r_id) // 房间ID
-//                                        put("from", userInfo.u_id) // 发送者u_id
-//                                        put("timestamp",newPosition) // 当前房间的视频的时间戳
-//                                    }.toString()
-//                                    webSocketManager?.sendMessage(wsComStr)
-//                                    Log.d("exoPlayerWS","房主将视频信息同步房间的用户发送成功！：${wsComStr}")
+//package com.example.myplayer.framework.playroom.player
+//
+//import android.app.Activity
+//import android.content.Context
+//import android.content.pm.ActivityInfo
+//import android.content.res.Configuration
+//import android.widget.Toast
+//import androidx.annotation.OptIn
+//import androidx.compose.animation.AnimatedVisibility
+//import androidx.compose.animation.fadeIn
+//import androidx.compose.animation.fadeOut
+//import androidx.compose.foundation.background
+//import androidx.compose.foundation.border
+//import androidx.compose.foundation.clickable
+//import androidx.compose.foundation.interaction.MutableInteractionSource
+//import androidx.compose.foundation.interaction.collectIsPressedAsState
+//import androidx.compose.foundation.layout.*
+//import androidx.compose.material.icons.Icons
+//import androidx.compose.material.icons.automirrored.filled.ArrowBack
+//import androidx.compose.material.icons.filled.*
+//import androidx.compose.material3.*
+//import androidx.compose.runtime.*
+//import androidx.compose.ui.Alignment
+//import androidx.compose.ui.Modifier
+//import androidx.compose.ui.graphics.Color
+//import androidx.compose.ui.platform.LocalConfiguration
+//import androidx.compose.ui.platform.LocalContext
+//import androidx.compose.ui.text.font.FontWeight
+//import androidx.compose.ui.text.style.TextOverflow
+//import androidx.compose.ui.unit.dp
+//import androidx.compose.ui.viewinterop.AndroidView
+//import androidx.lifecycle.LifecycleOwner
+//import androidx.lifecycle.compose.LocalLifecycleOwner
+//import androidx.media3.common.MediaItem
+//import androidx.media3.common.util.Log
+//import androidx.media3.common.util.UnstableApi
+//import androidx.media3.datasource.DefaultDataSource
+//import androidx.media3.exoplayer.ExoPlayer
+//import androidx.media3.exoplayer.dash.DashMediaSource
+//import androidx.media3.exoplayer.hls.HlsMediaSource
+//import androidx.media3.exoplayer.source.ProgressiveMediaSource
+//import androidx.media3.ui.PlayerView
+//import kotlinx.coroutines.delay
+//import kotlinx.coroutines.launch
+//
+//private fun isSupportedFormat(url: String): Boolean {
+//    val supportedFormats = listOf(
+//        ".mp4", ".m4a", ".m4v",
+//        ".mp3", ".webm", ".mkv",
+//        ".flv", ".wav", ".ogg",
+//        ".ts", ".m3u8", ".mpd"
+//    )
+//    return supportedFormats.any { url.lowercase().endsWith(it) }
+//}
+//
+//@OptIn(UnstableApi::class)
+//@Composable
+//fun PlayerWithFloatingControls(
+//    context: Context,
+//    videoUrl: String,
+//    roomId: String,
+//    onBack: () -> Unit,
+//    startPositionMs: Long = 0L,
+//    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
+//    reloadTrigger: Int = 0
+//) {
+//    var controlsVisible by remember { mutableStateOf(false) }
+//    val coroutineScope = rememberCoroutineScope()
+//    var isPlaying by remember { mutableStateOf(false) }
+//
+//    val configuration = LocalConfiguration.current
+//    val orientation = configuration.orientation
+//
+//    val exoPlayer = remember(context) {
+//        ExoPlayer.Builder(context).build().apply {
+//            playWhenReady = false
+//        }
+//    }
+//
+//    DisposableEffect(lifecycleOwner) {
+//        onDispose { exoPlayer.release() }
+//    }
+//
+//    fun startAutoHideTimer() {
+//        coroutineScope.launch {
+//            delay(4000)
+//            controlsVisible = false
+//        }
+//    }
+//
+//    LaunchedEffect(videoUrl, reloadTrigger) {
+//        try {
+//            exoPlayer.stop()
+//            exoPlayer.clearMediaItems()
+//
+//            if (!isSupportedFormat(videoUrl)) {
+//                Toast.makeText(context, "不支持的视频格式", Toast.LENGTH_SHORT).show()
+//                return@LaunchedEffect
+//            }
+//
+//            val dataSourceFactory = DefaultDataSource.Factory(context)
+//            val mediaSource = when {
+//                videoUrl.endsWith(".m3u8", true) -> HlsMediaSource.Factory(dataSourceFactory)
+//                    .createMediaSource(MediaItem.fromUri(videoUrl))
+//                videoUrl.endsWith(".mpd", true) -> DashMediaSource.Factory(dataSourceFactory)
+//                    .createMediaSource(MediaItem.fromUri(videoUrl))
+//                else -> ProgressiveMediaSource.Factory(dataSourceFactory)
+//                    .createMediaSource(MediaItem.fromUri(videoUrl))
+//            }
+//
+//            exoPlayer.setMediaSource(mediaSource)
+//            exoPlayer.prepare()
+//
+//            if (startPositionMs > 0) exoPlayer.seekTo(startPositionMs)
+//
+//            exoPlayer.playWhenReady = true
+//            isPlaying = true
+//
+//        } catch (e: Exception) {
+//            Toast.makeText(context, "视频加载失败：${e.message}", Toast.LENGTH_SHORT).show()
+//        }
+//    }
+//
+//    Box(
+//        modifier = Modifier
+//            .fillMaxSize()
+//            .background(Color.Black)
+//            .clickable(
+//                indication = null,
+//                interactionSource = remember { MutableInteractionSource() }
+//            ) {
+//                controlsVisible = !controlsVisible
+//                Log.d("exoPlayer","controlsVisible = $controlsVisible") // 打印状态
+//                if (controlsVisible) startAutoHideTimer()
+//            }
+//    ) {
+//        AndroidView(
+//            factory = {
+//                PlayerView(it).apply {
+//                    player = exoPlayer
+//                    useController = false
+//                }
+//            },
+//            modifier = Modifier.fillMaxSize()
+//        )
+//
+//        AnimatedVisibility(
+//            visible = controlsVisible,
+//            enter = fadeIn(),
+//            exit = fadeOut(),
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .background(Color(0x55000000))
+//        ) {
+//            val activity = (context as? Activity)
+//            Box(
+//                modifier = Modifier.fillMaxSize()
+//            )
+//            {
+//                    // 顶部区域
+//                    if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+//                        Box(
+//                            modifier = Modifier
+//                                .fillMaxWidth()
+//                                .height(56.dp)
+//                                .align(Alignment.TopStart)
+//                                .background(Color.Blue.copy(alpha = 0.3f))
+//                        ) {
+//                            Row(
+//                                modifier = Modifier
+//                                    .fillMaxWidth()
+//                                    .height(56.dp)
+//                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+//                                verticalAlignment = Alignment.CenterVertically
+//                            ) {
+//                                IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+//                                    Icon(
+//                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+//                                        contentDescription = "返回",
+//                                        tint = Color.White
+//                                    )
 //                                }
-//                                catch (e : Exception)
-//                                {
-//                                    Log.e("exoPlayerWS","房主将视频信息同步房间的用户失败！！：${e.message}")
-//                                }
-                            }
-                            Player.DISCONTINUITY_REASON_INTERNAL -> {
-                                Log.d("exoPlayerWS", "跳变原因：播放器内部原因")
-                            }
-                            Player.DISCONTINUITY_REASON_REMOVE -> {
-                                Log.d("exoPlayerWS", "跳变原因：播放段被移除")
-                            }
-                            else -> {
-                                Log.d("exoPlayerWS", "跳变原因：未知($reason)")
-                            }
-                        }
-                    }
-
-                })
-            }
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
-
-    val playerView = remember {
-        PlayerView(context).apply {
-            player = exoPlayer
-            useController = true
-            setShowMultiWindowTimeBar(true)
-            controllerShowTimeoutMs = 3000
-            controllerHideOnTouch = true
-
-            setOnClickListener {
-                if (!isControllerFullyVisible()) {
-                    showController()
-                } else {
-                    hideController()
-                }
-            }
-        }
-    }
-
-    AndroidView(factory = { playerView })
-
-    // 监听 videoUrl 和 reloadTrigger，触发播放资源重置和播放
-    LaunchedEffect(videoUrl, reloadTrigger) {
-        try {
-            exoPlayer.stop()
-            exoPlayer.clearMediaItems()
-
-            if (!isSupportedFormat(videoUrl)) {
-                Toast.makeText(context, "不支持的视频格式", Toast.LENGTH_SHORT).show()
-                return@LaunchedEffect
-            }
-
-            val dataSourceFactory = DefaultDataSource.Factory(context)
-            val mediaSource = when {
-                videoUrl.endsWith(".m3u8", true) -> HlsMediaSource.Factory(dataSourceFactory)
-                    .createMediaSource(MediaItem.fromUri(videoUrl))
-                videoUrl.endsWith(".mpd", true) -> DashMediaSource.Factory(dataSourceFactory)
-                    .createMediaSource(MediaItem.fromUri(videoUrl))
-                else -> ProgressiveMediaSource.Factory(dataSourceFactory)
-                    .createMediaSource(MediaItem.fromUri(videoUrl))
-            }
-
-            exoPlayer.setMediaSource(mediaSource)
-            exoPlayer.prepare()
-
-            if (startPositionMs > 0) {
-                exoPlayer.seekTo(startPositionMs)
-            }
-
-            exoPlayer.playWhenReady = true
-
-            playerView.player = exoPlayer
-
-        } catch (e: Exception) {
-            Log.e("exoPlayerView", "视频加载失败", e)
-            Toast.makeText(context, "视频加载失败：${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-}
-
-private fun isSupportedFormat(url: String): Boolean {
-    val supportedFormats = listOf(
-        ".mp4", ".m4a", ".m4v",
-        ".mp3", ".webm", ".mkv",
-        ".flv", ".wav", ".ogg",
-        ".ts", ".m3u8", ".mpd"
-    )
-    return supportedFormats.any { url.lowercase().endsWith(it) }
-}
+//                                Spacer(modifier = Modifier.width(8.dp))
+//                                Text(
+//                                    text = "房间ID：$roomId",
+//                                    color = Color.White,
+//                                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+//                                    maxLines = 1,
+//                                    overflow = TextOverflow.Ellipsis
+//                                )
+//                            }
+//                        }
+//                    } else {
+//                        // 横屏顶部可以不显示返回栏，或你也可以加其它控件
+//                        Spacer(modifier = Modifier.height(56.dp))
+//                    }
+//
+//                    // 中间
+//                    Box(
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .height(80.dp)
+//                            .align(Alignment.Center)
+//                            .background(Color.Magenta.copy(alpha = 0.3f))
+//                    ) {
+//                        Row(
+//                            modifier = Modifier
+//                                .fillMaxWidth()
+//                                .height(80.dp),  // 这里固定高度，不用weight撑开
+//                            horizontalArrangement = Arrangement.spacedBy(
+//                                40.dp,
+//                                Alignment.CenterHorizontally
+//                            ),
+//                            verticalAlignment = Alignment.CenterVertically,
+//                        ) {
+//                            // 快退按钮
+//                            IconButton(
+//                                onClick = {
+//                                    val newPos =
+//                                        (exoPlayer.currentPosition - 15_000).coerceAtLeast(0L)
+//                                    exoPlayer.seekTo(newPos)
+//                                },
+//                                modifier = Modifier.size(60.dp)
+//                            ) {
+//                                Text("<< 15s", color = Color.White)
+//                            }
+//
+//                            // 播放/暂停按钮
+//                            IconButton(
+//                                onClick = {
+//                                    if (exoPlayer.isPlaying) {
+//                                        exoPlayer.pause()
+//                                        isPlaying = false
+//                                    } else {
+//                                        exoPlayer.play()
+//                                        isPlaying = true
+//                                    }
+//                                },
+//                                modifier = Modifier.size(70.dp)
+//                            ) {
+//                                Icon(
+//                                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+//                                    contentDescription = if (isPlaying) "暂停" else "播放",
+//                                    tint = Color.White,
+//                                    modifier = Modifier.size(50.dp)
+//                                )
+//                            }
+//
+//                            // 快进按钮
+//                            IconButton(
+//                                onClick = {
+//                                    val duration =
+//                                        exoPlayer.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+//                                    val newPos =
+//                                        (exoPlayer.currentPosition + 15_000).coerceAtMost(duration)
+//                                    exoPlayer.seekTo(newPos)
+//                                },
+//                                modifier = Modifier.size(60.dp)
+//                            ) {
+//                                Text("15s >>", color = Color.White)
+//                            }
+//                        }
+//                    }
+//
+//                    // 底部区域保持不变
+//                    Row(
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .height(48.dp)
+//                            .background(Color.Red.copy(alpha = 0.5f))
+//                            .border(2.dp, Color.Yellow)
+//                            .align(Alignment.BottomStart)
+//                            .padding(horizontal = 12.dp),
+//                        verticalAlignment = Alignment.CenterVertically
+//                    ) {
+//                        PlayerProgressBar(
+//                            exoPlayer = exoPlayer,
+//                            modifier = Modifier.weight(1f)
+//                        )
+//                        //Spacer(modifier = Modifier.width(8.dp))
+//
+//                        IconButton(onClick = {
+//                            if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+//                                (context as? Activity)?.requestedOrientation =
+//                                    ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+//                            } else {
+//                                (context as? Activity)?.requestedOrientation =
+//                                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+//                            }
+//                        }) {
+//                            Icon(
+//                                imageVector = if (orientation == Configuration.ORIENTATION_PORTRAIT) Icons.Filled.Fullscreen else Icons.Filled.FullscreenExit,
+//                                contentDescription = "全屏切换",
+//                                tint = Color.White,
+//                                modifier = Modifier.size(28.dp)
+//                            )
+//                        }
+//                    }
+//
+//            }
+//        }
+//    }
+//}
+//
+//@kotlin.OptIn(ExperimentalMaterial3Api::class)
+//@Composable
+//fun PlayerProgressBar(
+//    exoPlayer: ExoPlayer,
+//    modifier: Modifier = Modifier
+//) {
+//    var sliderPosition by remember { mutableStateOf(0f) }
+//    var isUserDragging by remember { mutableStateOf(false) }
+//
+//    val interactionSource = remember { MutableInteractionSource() }
+//    val isPressed by interactionSource.collectIsPressedAsState()
+//
+//    LaunchedEffect(exoPlayer.isPlaying) {
+//        while (true) {
+//            if (!isUserDragging) {
+//                val duration = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+//                val position = exoPlayer.currentPosition.coerceAtMost(duration)
+//                sliderPosition = if (duration > 0) (position.toFloat() / duration) else 0f
+//            }
+//            delay(500)
+//        }
+//    }
+//
+//    val duration = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+//    val currentPosition = (sliderPosition * duration).toLong()
+//
+//    Column(modifier = modifier.padding(horizontal = 16.dp)) {
+//        Slider(
+//            value = sliderPosition,
+//            onValueChange = {
+//                sliderPosition = it
+//                isUserDragging = true
+//            },
+//            onValueChangeFinished = {
+//                isUserDragging = false
+//                exoPlayer.seekTo((sliderPosition * duration).toLong())
+//            },
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .height(24.dp),
+//            colors = SliderDefaults.colors(
+//                thumbColor = Color.Transparent,
+//                activeTrackColor = Color.White,
+//                inactiveTrackColor = Color.Gray
+//            ),
+//            thumb = { sliderState ->
+//                Icon(
+//                    imageVector = Icons.Default.AirportShuttle,
+//                    contentDescription = "滑块",
+//                    tint = if (isPressed) Color.Yellow else Color.White,
+//                    modifier = Modifier.size(20.dp)
+//                )
+//            }
+//        )
+//        Row(
+//            modifier = Modifier.fillMaxWidth(),
+//            horizontalArrangement = Arrangement.SpaceBetween
+//        ) {
+//            Text(text = formatTime(currentPosition), color = Color.White, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+//            Text(text = formatTime(duration), color = Color.White, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+//        }
+//    }
+//}
+//
+//fun formatTime(millis: Long): String {
+//    val totalSeconds = millis / 1000
+//    val minutes = totalSeconds / 60
+//    val seconds = totalSeconds % 60
+//    return String.format("%02d:%02d", minutes, seconds)
+//}
