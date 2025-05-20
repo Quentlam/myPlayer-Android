@@ -1,15 +1,11 @@
-package com.example.myplayer.network
+package com.example.myplayer.model
 
 import com.example.myplayer.framework.Dao.PlayroomDatabase
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.room.Room
-import com.example.myplayer.framework.playroom.PlayroomMessageHandler
-import com.example.myplayer.framework.playroom.PlayroomWebSocketManager
-import com.example.myplayer.model.playroom.Inviting
 import com.example.myplayer.model.playroom.RequestDetails
 import com.example.myplayer.model.playroom.Member
 import com.example.myplayer.model.playroom.Playroom

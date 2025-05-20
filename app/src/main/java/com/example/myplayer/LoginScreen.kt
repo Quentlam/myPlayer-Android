@@ -13,15 +13,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
 import com.example.myplayer.model.BaseResponseJsonData
 import com.example.myplayer.model.BaseSentJsonData
 import com.example.myplayer.model.UserInfo
-import com.example.myplayer.model.playroom.Playroom
-import com.example.myplayer.network.BaseInformation
+import com.example.myplayer.model.BaseInformation
 import com.example.myplayer.network.LoginRequest
 import com.example.myplayer.network.networkAPI.GetRequest
 import com.google.gson.Gson
@@ -40,7 +38,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.window.Dialog
-import androidx.lint.kotlin.metadata.Visibility
 import com.example.myplayer.framework.chat.ChatMessage
 import com.example.myplayer.framework.chat.chatMessagesMap
 import com.example.myplayer.model.WebSocketResponse
@@ -48,14 +45,12 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.window.DialogProperties
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
-import com.airbnb.lottie.compose.*
 
 
 private val TAG = "LoginScreen"

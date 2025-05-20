@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,16 +32,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myplayer.jsonToModel.JsonToBaseResponse
-import com.example.myplayer.model.BaseResponseJsonData
 import com.example.myplayer.model.BaseSentJsonData
 import com.example.myplayer.model.playroom.PlayroomContent
 import com.example.myplayer.model.playroom.RequestDetails
-import com.example.myplayer.network.BaseInformation.currentMemberList
-import com.example.myplayer.network.BaseInformation.currentRequestList
-import com.example.myplayer.network.BaseInformation.currentRoom
+import com.example.myplayer.model.BaseInformation.currentMemberList
+import com.example.myplayer.model.BaseInformation.currentRequestList
+import com.example.myplayer.model.BaseInformation.currentRoom
 import com.example.myplayer.network.BaseRequest
 import com.example.myplayer.userInfo
 import kotlinx.coroutines.Dispatchers
@@ -53,7 +50,6 @@ import java.time.format.DateTimeFormatter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -69,7 +65,6 @@ import com.example.myplayer.model.playroom.StopMessage
 import com.example.myplayer.model.playroom.SynchronousRequestMessage
 import com.example.myplayer.model.playroom.SynchronousResponseMessage
 import com.example.myplayer.model.playroom.UrlMessage
-import com.example.myplayer.network.BaseInformation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import org.json.JSONObject

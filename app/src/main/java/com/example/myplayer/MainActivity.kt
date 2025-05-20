@@ -27,7 +27,7 @@ package com.example.myplayer
     import com.example.myplayer.jsonToModel.JsonToBaseResponse
     import com.example.myplayer.model.BaseResponseJsonData
     import com.example.myplayer.model.BaseSentJsonData
-    import com.example.myplayer.network.BaseInformation
+    import com.example.myplayer.model.BaseInformation
     import com.example.myplayer.network.LoginRequest
     import com.example.myplayer.ui.theme.MyPlayerTheme
     import kotlinx.coroutines.launch

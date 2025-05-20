@@ -1,6 +1,6 @@
 package com.example.myplayer.network.networkAPI
 
-import com.example.myplayer.network.BaseInformation
+import com.example.myplayer.model.BaseInformation
 import com.example.myplayer.network.BaseRequest
 import kotlinx.coroutines.CoroutineScope
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull

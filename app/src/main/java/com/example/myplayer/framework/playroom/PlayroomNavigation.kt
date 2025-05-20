@@ -34,7 +34,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.Modifier
-import com.example.myplayer.network.BaseInformation.currentRoom
+import com.example.myplayer.model.BaseInformation.currentRoom
 
 
 @Composable

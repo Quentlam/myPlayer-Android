@@ -3,7 +3,7 @@ package com.example.myplayer.framework.playroom
 import android.content.Context
 import android.util.Log
 import com.example.myplayer.model.playroom.PlayroomContent
-import com.example.myplayer.network.DatabaseProvider
+import com.example.myplayer.model.DatabaseProvider
 
 suspend fun savePlayroomMessage(context : Context, msg : PlayroomContent)
 {
