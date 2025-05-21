@@ -54,7 +54,6 @@ dependencies {
 
     // Compose (由 BOM 统一管理)
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-extended")
     //implementation("androidx.compose.material:material-ui:${libs.versions.roomRuntimeAndroid.get()}")
     implementation(libs.androidx.ui)
@@ -97,12 +96,10 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     // 第三方播放器库
-    implementation("com.github.PalankiBharat:ExoPlayerPlus:0.2.0") {
-        exclude(group = "androidx.compose.material3", module = "material3")
-        exclude(group = "androidx.compose.material3", module = "material3-window-size-class")
-    }
+    implementation("com.github.PalankiBharat:ExoPlayerPlus:0.2.0")
 
     
     //刷新器
     implementation("androidx.compose.material:material")
+    implementation("androidx.compose.material3:material3:1.2.0")
 }

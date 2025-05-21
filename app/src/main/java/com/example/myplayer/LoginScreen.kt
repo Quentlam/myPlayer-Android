@@ -7,6 +7,7 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,15 +50,18 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.DialogProperties
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.example.myplayer.framework.chat.GlobalMessageNotifier
 import com.example.myplayer.framework.chat.saveChatMessage
 import com.example.myplayer.model.chat.ChatMessage
 import com.example.myplayer.userInfo.isConnected
+import kotlinx.coroutines.delay
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -84,7 +88,7 @@ fun LoginScreen(
     val friendCoroutineScope = rememberCoroutineScope()
     val userInfoCoroutineScope = rememberCoroutineScope()
     var errorMessage by remember { mutableStateOf("") }
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
 
 
     if (showErrorDialog) {
@@ -467,8 +471,13 @@ suspend fun connectToWS(
                                 )
                             )
                         }
-                        CoroutineScope(Dispatchers.Main).launch{
-                            Toast.makeText(context, "收到来自${data.sender_name}的消息: ${data.content}", Toast.LENGTH_SHORT).show()
+                        if(userInfo.currentFriend != data.sender)
+                        {
+                            CoroutineScope(Dispatchers.Default).launch{
+                                //Toast.makeText(context, "收到来自${data.sender_name}的消息: ${data.content}", Toast.LENGTH_SHORT).show()
+                                val notifyMsg = "收到来自${data.sender_name}的消息: ${data.content}"
+                                GlobalMessageNotifier.notify(notifyMsg)
+                            }
                         }
                         Log.i(TAG, "收到来自${data.sender_name}的消息: ${data.content}")
                     }
@@ -534,3 +543,5 @@ suspend fun connectToWS(
     }
     webSocketManager?.connect(listener)
 }
+
+

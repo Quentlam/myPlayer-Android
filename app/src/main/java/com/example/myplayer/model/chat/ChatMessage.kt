@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 // 新增数据类，用于存储聊天消息和时间
 @Entity(tableName = "chatMessage")
 data class ChatMessage(
-    @PrimaryKey(autoGenerate = true) val chat_id: Int,
+    @PrimaryKey(autoGenerate = true) var chat_id: Int = 0,
     val accpet_id: String,//接收者的id
     val sender_id: String,//对面的id
     val content: String? = null,

@@ -73,7 +73,7 @@ val chatMessagesMap = mutableStateMapOf<String, SnapshotStateList<ChatMessage>>(
 fun ChatScreen() {
     var currentScreen by remember { mutableStateOf(ChatScreenState.FRIEND_LIST) }
     var selectedFriend by remember { mutableStateOf<UserInfo?>(null) } // 修改类型
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
     val coroutineScope = rememberCoroutineScope()
     coroutineScope.launch {
         withContext(Dispatchers.IO){
@@ -120,6 +120,7 @@ fun ChatScreen() {
                         friends = userInfo.friendList,
                         onFriendClick = { friend ->
                             selectedFriend = friend
+                            userInfo.currentFriend = friend.u_id
                             currentScreen = ChatScreenState.CHAT_DETAIL
                         },
                         modifier = Modifier.fillMaxSize()
@@ -160,7 +161,6 @@ fun ChatScreen() {
                                 saveChatMessage(
                                     context,
                                     ChatMessage(
-                                        chat_id = 0,
                                         sender_id = userInfo.u_id,
                                         accpet_id = selectedFriend!!.u_id,
                                         content = it,
@@ -214,7 +214,7 @@ private fun ChatDetailScreen(
     onMessageSent: (String) -> Boolean
 ) {
     var message by remember { mutableStateOf("") }
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
 // 将 Flow 转为 State<List<ChatMessage>>
 
     val chatMessages by getChatMessageById(context,userInfo.u_id,friend!!.u_id)
@@ -225,7 +225,7 @@ private fun ChatDetailScreen(
 
     LaunchedEffect(chatMessages.size) {
         if (chatMessages.isNotEmpty()) {
-            listState.animateScrollToItem(chatMessages.size - 1)
+            listState.animateScrollToItem(chatMessages.size - 1) // 滚动到顶部显示最新
         }
     }
 
@@ -280,9 +280,9 @@ private fun ChatDetailScreen(
                 items(chatMessages) { msg ->
                     val isMyMessage = msg.sender_id == userInfo.u_id
                     if (msg.isSent == true) {
-                        msg.content?.let { ChatBubble(message = it, isMyMessage = isMyMessage) }
+                        msg.content?.let { msg.time?.let { it1 -> ChatBubble(message = it, isMyMessage = isMyMessage,time = it1) } }
                     } else {
-                        msg.content?.let { PendingChatBubble(message = it, isMyMessage = isMyMessage) }
+                        msg.content?.let { msg.time?.let { it1 -> PendingChatBubble(message = it, isMyMessage = isMyMessage,time = it1) } }
                     }
                 }
             }
@@ -295,7 +295,8 @@ private fun ChatDetailScreen(
 @Composable
 fun ChatBubble(
     message: String,
-    isMyMessage: Boolean
+    isMyMessage: Boolean,
+    time: String  // 新增时间字符串参数
 ) {
     // 气泡颜色
     val bubbleColor = if (isMyMessage)
@@ -336,7 +337,7 @@ fun ChatBubble(
             modifier = Modifier
                 .background(color = bubbleColor, shape = shape)
                 .padding(horizontal = 14.dp, vertical = 10.dp)
-                .widthIn(max = 280.dp)  // 最大宽度限制，防止过宽
+                .widthIn(max = 280.dp)
         ) {
             Text(
                 text = message,
@@ -344,13 +345,21 @@ fun ChatBubble(
                 style = MaterialTheme.typography.bodyMedium
             )
         }
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = time,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
     }
 }
 
 @Composable
 fun PendingChatBubble(
     message: String,
-    isMyMessage: Boolean  // 这里也传入以决定气泡左右位置
+    isMyMessage: Boolean,
+    time: String  // 新增时间字符串参数
 ) {
     val bubbleColor = if (isMyMessage)
         MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f) // 警示色淡色气泡
@@ -390,20 +399,12 @@ fun PendingChatBubble(
             horizontalArrangement = if (isMyMessage) Arrangement.End else Arrangement.Start,
             // 感叹号总是放在消息体左边，顺序不变
         ) {
-            // 感叹号
-//            Text(
-//                text = "⚠️",
-//                color = MaterialTheme.colorScheme.error,
-//                fontSize = 16.sp,
-//                modifier = Modifier.padding(bottom = 2.dp)
-//            )
             Icon(
                 imageVector = Icons.Default.Error,
                 contentDescription = "错误",
                 tint = MaterialTheme.colorScheme.error, // 一般红色
                 modifier = Modifier.size(16.dp)
             )
-
 
             Spacer(modifier = Modifier.width(6.dp))
 
@@ -420,8 +421,16 @@ fun PendingChatBubble(
                 )
             }
         }
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = time,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
     }
 }
+
 
 
 

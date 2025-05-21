@@ -201,7 +201,7 @@ fun manageRoomContent(
     var showRoomSetting by remember { mutableStateOf(false) }
     var showSuccessToast by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
     getInvitations(currentRoom.r_id)
 
 
@@ -624,7 +624,7 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
         "chosePlayroomScreen",
         "现在的房间ID：${currentRoom.r_id},视频连接：${currentRoom.current_url},头像URL${currentRoom.r_avatar},房间介绍${currentRoom.r_introduction},房间名字${currentRoom.r_name}"
     )
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     var currentTab by remember { mutableStateOf(0) }
     var messageInput by remember { mutableStateOf("") }

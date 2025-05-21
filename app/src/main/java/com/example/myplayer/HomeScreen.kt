@@ -1,6 +1,7 @@
 package com.example.myplayer
 
 import android.app.Activity
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,15 +20,18 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.myplayer.framework.chat.ChatScreen
+import com.example.myplayer.framework.chat.GlobalMessageNotifier
+import com.example.myplayer.framework.chat.TopMessageBanner
 import com.example.myplayer.framework.friend.FriendsScreen
 import com.example.myplayer.framework.me.SettingScreen
 import com.example.myplayer.framework.playroom.PlayroomNavigation
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(onLogout: () -> Unit) {
     val navController = rememberNavController()
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
     val window = (context as? Activity)?.window
     val windowInsetsController = remember(context) {
         window?.let { WindowInsetsControllerCompat(it, it.decorView) }
@@ -42,6 +46,7 @@ fun HomeScreen(onLogout: () -> Unit) {
 
     // 状态：是否隐藏底部导航栏，初始false
     var hideBottomBar by remember { mutableStateOf(false) }
+
 
     Scaffold(
         bottomBar = {

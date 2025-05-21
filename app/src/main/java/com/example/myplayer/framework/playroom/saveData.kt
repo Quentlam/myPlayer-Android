@@ -10,7 +10,7 @@ suspend fun savePlayroomMessage(context : Context, msg : PlayroomContent)
     try {
         val dao = DatabaseProvider.getPlayRoomDatabase(context).playroomContentDao()
         dao.addCurrentPlayroomContent(msg)
-        Log.d("saveData","弹幕消息存储成功！${msg.content}")
+        Log.d("saveData","弹幕消息存储成功！${msg}")
     }
     catch (e : Exception)
     {
