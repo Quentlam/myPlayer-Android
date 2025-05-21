@@ -2,8 +2,11 @@ package com.example.myplayer.framework.chat
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -217,6 +220,9 @@ private fun ChatDetailScreen(
     onBack: () -> Unit,
     onMessageSent: (String) -> Boolean
 ) {
+    BackHandler(enabled = true) {
+            onBack()
+    }
     LaunchedEffect(Unit) {
         onEnterChatDetialScreen()
     }
@@ -241,9 +247,7 @@ private fun ChatDetailScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.ime)  // 让内容在键盘弹起时上移
         ) {
-            // 顶部栏，仿CenterAlignedTopAppBar实现
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -265,10 +269,8 @@ private fun ChatDetailScreen(
 
             // 聊天内容列表，填满剩余空间
             LazyColumn(
-                modifier = Modifier.weight(1f),
-                state = listState,
-                contentPadding = PaddingValues(vertical = 8.dp, horizontal = 12.dp),
-                reverseLayout = false // 根据需要调整是否倒序显示
+                modifier = Modifier,
+                state = listState
             ) {
                 items(chatMessages) { msg ->
                     val isMyMessage = msg.sender_id == u_id
@@ -295,13 +297,14 @@ private fun ChatDetailScreen(
                     }
                 }
             }
-
             // 底部消息输入栏
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .height(56.dp),  // 固定高度48dp，避免高度过大
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TextField(
                     value = message,
