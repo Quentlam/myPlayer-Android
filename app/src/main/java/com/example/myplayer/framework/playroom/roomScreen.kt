@@ -1,5 +1,7 @@
 package com.example.myplayer.framework.playroom
 
+import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -55,6 +57,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
+import com.example.myplayer.framework.playroom.player.PlayerWithFloatingControls
 import com.example.myplayer.model.playroom.JoinMessage
 import com.example.myplayer.model.playroom.Member
 import com.example.myplayer.model.playroom.Message
@@ -65,13 +68,13 @@ import com.example.myplayer.model.playroom.StopMessage
 import com.example.myplayer.model.playroom.SynchronousRequestMessage
 import com.example.myplayer.model.playroom.SynchronousResponseMessage
 import com.example.myplayer.model.playroom.UrlMessage
-import com.palankibharat.exo_compose_player.ExoComposePlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 import java.time.ZoneId
 import java.time.ZonedDateTime
-
+import androidx.compose.material3.*
+import androidx.compose.ui.tooling.preview.Preview
 
 val messageHandler = object : PlayroomMessageHandler {
     override fun onUserJoined(context : Context,msg: JoinMessage) {//如果加入了，就需要给房间的视频连接
@@ -617,6 +620,7 @@ private fun ManagementItem(
     }
 }
 
+@SuppressLint("ContextCastToActivity")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun roomScreen(room : Playroom,onBack: () -> Unit) {
@@ -632,6 +636,8 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
         .collectAsStateWithLifecycle(initialValue = emptyList())//直接获取Flow并且转换为Status
     var startPositionMs by remember { mutableStateOf(0L) }
     var reloadTrigger by remember { mutableStateOf(0) }//刷新视频
+
+
 
 
     // 添加 LazyListState 来控制滚动
@@ -654,7 +660,7 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
             playRoomWebSocketManager?.disconnect()
             playRoomWebSocketManager = null
             Log.d("roomScreen", "roomScreen离开，WebSocket已正常断开")
-            Toast.makeText(context, "已离开房间！:${currentRoom.r_id}", Toast.LENGTH_SHORT).show()
+            //Toast.makeText(context, "已离开房间！:${currentRoom.r_id}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -664,7 +670,6 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
             listState.animateScrollToItem(messageList.size - 1)
         }
     }
-    getMembers(currentRoom.r_id)
 
     Scaffold(
     ) { padding ->
@@ -680,10 +685,16 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                     .aspectRatio(16f / 9f)  // 使用16:9的视频比例
             ) {
                 currentRoom.current_url?.let {
-                    ExoComposePlayer(
-                        modifier = Modifier.fillMaxWidth().aspectRatio(16f/9f),
-                        mediaUrl = it
-                    )
+                    (LocalContext.current as? Activity)?.let { it1 ->
+                        PlayerWithFloatingControls(
+                            context = it1,
+                            videoUrl = it,
+                            roomId = currentRoom.r_id,
+                            onBack = { onBack() },
+                            startPositionMs = startPositionMs,
+                            reloadTrigger = reloadTrigger
+                        )
+                    }
                 }
             }
 
@@ -701,7 +712,12 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                     )
                     Tab(
                         selected = currentTab == 1,
-                        onClick = { currentTab = 1 },
+                        onClick = {
+                            currentTab = 1
+                            CoroutineScope(Dispatchers.IO).launch{
+                                getMembers(context,scope,currentRoom.r_id)
+                            }
+                                  },
                         text = { Text("房间成员") }
                     )
                     Tab(
@@ -755,42 +771,46 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .height(48.dp),
+                    .height(56.dp),  // 固定高度48dp，避免高度过大
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp) // 增加组件间距
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val customTextSelectionColors = TextSelectionColors(
-                    handleColor = MaterialTheme.colorScheme.primary,
-                    backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                    handleColor = Color.Red,
+                    backgroundColor = Color.LightGray.copy(alpha = 0.4f)
                 )
+
                 CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
                     TextField(
                         value = messageInput,
                         onValueChange = { messageInput = it },
                         modifier = Modifier
                             .weight(1f)
-                            .background( // 添加背景色
+                            .height(56.dp)   // 高度显式设定，略小于Row高度，避免挤压
+                            .background(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(24.dp)
+                                shape = RoundedCornerShape(12.dp)
                             )
-                            .border( // 添加轻微边框
+                            .border(
                                 width = 1.dp,
                                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(24.dp)
+                                shape = RoundedCornerShape(12.dp)
                             )
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = 12.dp),
                         placeholder = {
                             Text(
-                                "输入弹幕...",
+                                text = "输入弹幕...",
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            fontSize = 14.sp,    // 放大字体
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 30.sp   // 设置行高
                         ),
+                        shape = RoundedCornerShape(12.dp),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
@@ -798,13 +818,12 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                             unfocusedIndicatorColor = Color.Transparent,
                             disabledIndicatorColor = Color.Transparent,
                             errorIndicatorColor = Color.Transparent
-                        ),
-                        shape = RoundedCornerShape(24.dp)
+                        )
                     )
                 }
 
                 Button(
-                    onClick = {
+                    onClick =  {
                         if (messageInput.isNotBlank()) {
                             scope.launch {
                                 try {
@@ -845,22 +864,23 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                     modifier = Modifier
                         .height(40.dp)
                         .widthIn(min = 72.dp)
-                        .scale(0.9f),
+                        .align(Alignment.CenterVertically),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
-                    interactionSource = remember { MutableInteractionSource() }, // 保留这个
+                    interactionSource = remember { MutableInteractionSource() },
                 ) {
                     Text(
                         "发送",
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium, // 稍微加粗
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 }
             }
+
 
         }
     }
@@ -1028,3 +1048,19 @@ suspend fun uploadImageAndGetUrl(uri: Uri): String {//待定，因为服务器�
 }
 
 
+
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 640)
+@Composable
+fun RoomScreenPreview() {
+    val fakeRoom = Playroom(
+        r_id = "room1",
+        current_url = "https://example.com/video.mp4",
+        r_avatar = "https://example.com/avatar.png",
+        r_introduction = "这是一个测试房间",
+        r_name = "测试房间名称",
+        // 其他Playroom字段用默认或模拟数据初始化
+    )
+    // 记得初始化 currentRoom 为 fakeRoom 或者在roomScreen中改用room参数
+    roomScreen(room = fakeRoom, onBack = {})
+}

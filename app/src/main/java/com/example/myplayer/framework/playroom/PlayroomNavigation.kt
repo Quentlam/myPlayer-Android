@@ -18,15 +18,21 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -43,6 +49,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import com.example.myplayer.model.BaseInformation.currentRoom
 
 
@@ -89,7 +96,7 @@ fun PlayroomNavigation(
 
 
 
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun customTopAppBar(
     searchQuery: String,
@@ -98,97 +105,113 @@ fun customTopAppBar(
     onSearchFriendPlayroomClick: () -> Unit = {},
     onInviteCodeClick: () -> Unit = {}
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .background(Color(0xFFF19E9E)) // 粉色背景
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
+    var expanded by remember { mutableStateOf(false) }
+
+    Surface(
+        tonalElevation = 4.dp,
+        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.primaryContainer, // 主题色容器
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .height(40.dp)
-                .background(Color.White, RoundedCornerShape(4.dp))
+                .height(56.dp)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 8.dp)
-            ) {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = null,
-                    tint = Color.Gray
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                BasicTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    textStyle = TextStyle(color = Color.Black),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            if (searchQuery.isEmpty()) {
-                Text(
-                    "搜索已经加入的播放室",
-                    color = Color.Gray,
-                    modifier = Modifier.padding(start = 40.dp, top = 10.dp)
-                )
-            }
-        }
+                    .weight(1f)
+                    .height(56.dp), // 恢复默认高度
+                placeholder = {
+                    Text(
+                        "搜索已经加入的播放室",
+                        style = MaterialTheme.typography.bodyLarge // 统一字体风格
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "搜索图标"
+                    )
+                },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    errorIndicatorColor = Color.Transparent
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
 
-        Spacer(modifier = Modifier.width(16.dp))
-        Button(
-            onClick = {
-                onSearchClick()
-            }
-        ) {
-            Text("搜索")
-        }
-        Spacer(modifier = Modifier.width(16.dp))
 
-        // 新增部分：白色加号按钮和菜单
-        var expanded by remember { mutableStateOf(false) }
-        Box {
-            IconButton(
-                onClick = { expanded = true },
-                modifier = Modifier
-                    .width(24.dp)
-                    .height(24.dp)
-                    .background(Color.White, shape = CircleShape)
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // 搜索按钮
+            Button(
+                onClick = onSearchClick,
+                modifier = Modifier.height(40.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "新增菜单",
-                    tint = Color.Black,
-                    modifier = Modifier.width(24.dp)
+                Icon(Icons.Default.Search, contentDescription = "搜索按钮")
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("搜索")
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // 加号按钮，带阴影圆形背景
+            Box {
+                IconButton(
+                    onClick = { expanded = true },
+                    modifier = Modifier
+                        .width(24.dp)
                         .height(24.dp)
-                )
-            }
+                        .background(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = CircleShape
+                        )
+                        .shadow(4.dp, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "新增菜单",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
 
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(Color.White)
-            ) {
-                DropdownMenuItem(
-                    onClick = {
-                        expanded = false
-                        onSearchFriendPlayroomClick()
-                    },
-                    text = { Text("搜索朋友播放室") },
-                )
-                DropdownMenuItem(
-                    onClick = {
-                        expanded = false
-                        onInviteCodeClick()
-                    },
-                    text = { Text("邀请码进入") },
-                )
-
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                ) {
+                    DropdownMenuItem(
+                        onClick = {
+                            expanded = false
+                            onSearchFriendPlayroomClick()
+                        },
+                        text = { Text("搜索朋友播放室") },
+                        leadingIcon = {
+                            Icon(Icons.Default.PersonSearch, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        onClick = {
+                            expanded = false
+                            onInviteCodeClick()
+                        },
+                        text = { Text("邀请码进入") },
+                        leadingIcon = {
+                            Icon(Icons.Default.VpnKey, contentDescription = null)
+                        }
+                    )
+                }
             }
         }
     }

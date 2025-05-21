@@ -5,6 +5,13 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +26,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -39,6 +50,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,6 +90,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
@@ -135,45 +148,33 @@ fun getInvitations(roomId: String)
 }
 
 
-@Composable
-fun getMembers(roomId: String)
+suspend fun getMembers(context: Context, coroutineScope: CoroutineScope, roomId: String)
 {
-    var isLoading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    try {
+        val memberRequest = GetRequest(
+            interfaceName = "/room/getmember",
+            queryParams = mapOf("r_id" to roomId)
+        )
 
-    LaunchedEffect(roomId) {
-        try {
-            isLoading = true
-            error = null
-
-            val memberRequest = GetRequest(
-                interfaceName = "/room/getmember",
-                queryParams = mapOf("r_id" to roomId)
+        // 在协程中执行网络请求
+        withContext(Dispatchers.IO) {
+            val memberResponse = memberRequest.execute(coroutineScope)
+            val gson = Gson()
+            val memberType = object : TypeToken<BaseResponseJsonData<List<Member>>>() {}.type
+            val memberData = gson.fromJson<BaseResponseJsonData<List<Member>>>(
+                memberResponse.body?.string(),
+                memberType
             )
 
-            // 在协程中执行网络请求
-            withContext(Dispatchers.IO) {
-                val memberResponse = memberRequest.execute(scope)
-                val gson = Gson()
-                val memberType = object : TypeToken<BaseResponseJsonData<List<Member>>>() {}.type
-                val memberData = gson.fromJson<BaseResponseJsonData<List<Member>>>(
-                    memberResponse.body?.string(),
-                    memberType
-                )
-
-                // 更新状态
-                withContext(Dispatchers.Main) {
-                    currentMemberList = memberData.data ?: emptyList()
-                    isLoading = false
-                }
-                Log.d("roomScreen", "加载成员列表成功，已加载成员：${currentMemberList.size}")
+            // 更新状态
+            withContext(Dispatchers.Main) {
+                currentMemberList = memberData.data ?: emptyList()
             }
-        } catch (e: Exception) {
-            Log.e("roomScreen", "加载成员列表失败", e)
-            error = "加载成员列表失败: ${e.message}"
-            isLoading = false
+            Log.d("roomScreen", "加载成员列表成功，已加载成员：${currentMemberList.size}")
         }
+    } catch (e: Exception) {
+        Log.e("roomScreen", "加载成员列表失败", e)
+        Toast.makeText(context, "加载成员列表失败: ${e.message}", Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -199,10 +200,10 @@ fun getAllPlayrooms(coroutineScope: CoroutineScope,context: Context): Flow<List<
         }
     } catch (e: Exception) {
         Log.e("Playrooms", "获取播放室列表异常：${e.message}")
-        CoroutineScope(Dispatchers.Main).launch{
-            Toast.makeText(context, "已离线！", Toast.LENGTH_SHORT).show()
-        }
-        throw e
+//        CoroutineScope(Dispatchers.Main).launch{
+//            Toast.makeText(context, "已离线！", Toast.LENGTH_SHORT).show()
+//        }
+         emit(emptyList())
     }
 }.flowOn(Dispatchers.IO)
 
@@ -218,42 +219,73 @@ suspend fun loadAllPlayroom(coroutineScope: CoroutineScope,context: Context) : B
                 }
         }
         Log.d("preparePlayroomData","加载房间内容成功！:${roomList}")
-        Toast.makeText(context, "加载房间内容成功！", Toast.LENGTH_SHORT).show()
         return false
     } catch (e: Exception) {
         withContext(Dispatchers.Main) {
             Log.e("preparePlayroomData","加载房间内容失败！:${e.message}")
-            Toast.makeText(context, "加载房间内容失败！:${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "加载房间内容失败,请检查网络设置！", Toast.LENGTH_SHORT).show()
         }
     }
     return true
 }
 
 
+
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun playroomListScreen(onJoinRoom: (Playroom) -> Unit) {
     val scope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var searchRoomList by remember { mutableStateOf<List<Playroom>>(emptyList()) }
 
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
+
+    var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     // 这是过滤后的列表状态，默认为全部
     var filteredRoomList by remember { mutableStateOf(roomList.toList()) }
-
-    LaunchedEffect(Unit) {
-        isLoading = loadAllPlayroom(scope,context)
-        // 加载后初始化过滤列表为全部
-        filteredRoomList = roomList.toList()
-    }
+    var visibleRoomList = remember { mutableStateListOf<Playroom>() }
 
     var showAddPlayroomDialog by remember { mutableStateOf(false) }
     var showSearchRoomDialog by remember { mutableStateOf(false) }
     var showSearchRoomListDialog by remember { mutableStateOf(false) }
     var showInviteCodeDialog by remember { mutableStateOf(false) }
 
+
+
+    // 下拉刷新状态
+    val pullRefreshState = rememberPullRefreshState(isRefreshing, {
+        // 用户下拉刷新时执行
+        scope.launch {
+            isRefreshing = true
+            val loadResult = loadAllPlayroom(scope, context)
+            if (loadResult) {
+                error = "刷新失败，请检查网络"
+            } else {
+                error = null
+                filteredRoomList = roomList.toList()
+                Toast.makeText(context, "刷新房间", Toast.LENGTH_SHORT).show()
+            }
+            isRefreshing = false
+        }
+    })
+
+    // 初始加载
+    LaunchedEffect(Unit) {
+        isLoading = loadAllPlayroom(scope, context)
+        filteredRoomList = roomList.toList()
+        isLoading = false
+    }
+
+    LaunchedEffect(filteredRoomList) {
+        visibleRoomList.clear()
+        filteredRoomList.forEach { room ->
+            visibleRoomList.add(room)
+            kotlinx.coroutines.delay(100)
+        }
+    }
 
     if (showSearchRoomDialog) {
         SearchRoomDialog(
@@ -378,53 +410,68 @@ fun playroomListScreen(onJoinRoom: (Playroom) -> Unit) {
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
-            if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pullRefresh(pullRefreshState) // 添加下拉刷新修饰符
+                .padding(padding)
+        ) {
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
-            } else if (error != null) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("加载失败: $error", color = Color.Red)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = {
-                            error = null
-                            isLoading = true
-                            scope.launch {
-                                isLoading = loadAllPlayroom(scope,context)
-                                filteredRoomList = roomList.toList()
+                error != null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("加载失败: $error", color = Color.Red)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(onClick = {
+                                error = null
+                                isLoading = true
+                                scope.launch {
+                                    isLoading = loadAllPlayroom(scope, context)
+                                    filteredRoomList = roomList.toList()
+                                    isLoading = false
+                                }
+                            }) {
+                                Text("重试")
                             }
-                        }) {
-                            Text("重试")
                         }
                     }
                 }
-            } else if (filteredRoomList.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("暂无符合条件的播放室")
+                filteredRoomList.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("暂无符合条件的播放室")
+                    }
                 }
-            } else {
-                LazyColumn {
-                    items(filteredRoomList) { room ->
-                        room.current_url = testUrl2 // 用于测试
-                        setPlayroomItem(
-                            room = room,
-                            onJoin = { onJoinRoom(room) },
-                            onManage = {}
-                        )
+                else -> {
+                    LazyColumn {
+                        items(
+                            items = visibleRoomList,
+                            key = { it.r_id }
+                        ) { room ->
+                            AnimatedItem(room = room, onJoinRoom = onJoinRoom)
+                        }
                     }
                 }
             }
+
+            PullRefreshIndicator(
+                refreshing = isRefreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
     }
 }
@@ -439,13 +486,24 @@ private fun setPlayroomItem(room: Playroom, onJoin: () -> Unit, onManage: () -> 
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
+            .border(
+                width = 1.dp,
+                color = Color.Blue,
+                shape = MaterialTheme.shapes.medium  // 使用Card的默认形状
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White // 设置背景为白色
+        )
     ) {
         // 在PlayroomItem的onJoin回调中添加
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.padding(8.dp),  // 添加内边距
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             IconButton(onClick = onManage) {
                 Icon(Icons.Default.PlayArrow, contentDescription = "管理")
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f))  {
                 Text("房间名称：${room.r_name}", style = MaterialTheme.typography.titleMedium)
                 Text("介绍：${room.r_introduction}", style = MaterialTheme.typography.bodyMedium)
             }
@@ -657,26 +715,26 @@ suspend fun connectToPlayroomWS(
                 override fun onOpen(webSocket: WebSocket, response: Response) {
                     super.onOpen(webSocket, response)
                     Log.d("PlayroomWebSocketManager", "房间：${currentRoom.r_id}WebSocket连接成功！")
-                    mainHandler.post {
-                        Toast.makeText(context, "连接房间成功！", Toast.LENGTH_SHORT).show()
-                    }
+//                    mainHandler.post {
+//                        Toast.makeText(context, "连接房间成功！", Toast.LENGTH_SHORT).show()
+//                    }
                     // 此处可以通知UI或更新状态：连接已建立
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                     Log.e("PlayroomWebSocketManager", "WebSocket连接失败，准备重连", t)
-                    mainHandler.post {
-                        Toast.makeText(context, "与房间断开连接！准备重连", Toast.LENGTH_SHORT)
-                            .show()
-                    }
+//                    mainHandler.post {
+//                        Toast.makeText(context, "与房间断开连接！准备重连", Toast.LENGTH_SHORT)
+//                            .show()
+//                    }
                     restartWebSocketWithDelay()
                 }
 
                 override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                     Log.d("PlayroomWebSocketManager", "WebSocket已关闭，准备重连")
-                    mainHandler.post {
-                        Toast.makeText(context, "房间关闭连接！准备重连", Toast.LENGTH_SHORT).show()
-                    }
+//                    mainHandler.post {
+//                        Toast.makeText(context, "房间关闭连接！准备重连", Toast.LENGTH_SHORT).show()
+//                    }
                     restartWebSocketWithDelay()
                 }
 
@@ -685,10 +743,10 @@ suspend fun connectToPlayroomWS(
                         // 3秒后重连，避免频繁重连导致资源浪费或被封禁
                         Handler(Looper.getMainLooper()).postDelayed({
                             Log.d("PlayroomWebSocketManager", "开始重连WebSocket")
-                            mainHandler.post {
-                                Toast.makeText(context, "开始重连WebSocket", Toast.LENGTH_SHORT)
-                                    .show()
-                            }
+//                            mainHandler.post {
+//                                Toast.makeText(context, "开始重连WebSocket", Toast.LENGTH_SHORT)
+//                                    .show()
+//                            }
                             // 重新调用连接函数
                             coroutineScope.launch {
                                 connectToPlayroomWS(
@@ -703,7 +761,7 @@ suspend fun connectToPlayroomWS(
                         mainHandler.post {
                             Toast.makeText(
                                 context,
-                                "WebSocket重连失败:${e.message}",
+                                "房间重连失败:${e.message}",
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -715,13 +773,13 @@ suspend fun connectToPlayroomWS(
                 "PlayroomWebSocketManager",
                 "尝试连接：wss://www.myplayer.merlin.xin/video?u_id=${userInfo.u_id}&u_name=${userInfo.u_name}&r_id=${currentRoom.r_id}"
             )
-            mainHandler.post {
-                Toast.makeText(context, "重连房间中！", Toast.LENGTH_SHORT).show()
-            }
+//            mainHandler.post {
+//                Toast.makeText(context, "重连房间中！", Toast.LENGTH_SHORT).show()
+//            }
         }
     } catch (e: Exception) {
         Log.e("PlayroomWebSocketManager", "连接webSocket失败", e)
-        Toast.makeText(context, "连接房间失败！:${e.message}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "连接房间异常！:${e.message}", Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -914,4 +972,27 @@ fun SearchResultDialog(
             }
         }
     )
+}
+
+
+@Composable
+fun AnimatedItem(room: Playroom, onJoinRoom: (Playroom) -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        visible = true  // 进入组合后触发动画
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(
+            animationSpec = tween(600, easing = FastOutSlowInEasing)
+        ) + slideInVertically(
+            initialOffsetY = { it / 2 }, animationSpec = tween(600, easing = FastOutSlowInEasing)
+        ),
+        exit = fadeOut(tween(300))
+    ) {
+        room.current_url = testUrl2
+        setPlayroomItem(room, onJoin = { onJoinRoom(room) }, onManage = {})
+    }
 }

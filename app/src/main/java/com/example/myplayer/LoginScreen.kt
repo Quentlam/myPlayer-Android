@@ -1,6 +1,7 @@
 package com.example.myplayer
 
 import SHA256Util
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -59,6 +60,9 @@ import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.myplayer.framework.chat.GlobalMessageNotifier
 import com.example.myplayer.framework.chat.saveChatMessage
+import com.example.myplayer.framework.playroom.saveAccount
+import com.example.myplayer.model.DatabaseProvider
+import com.example.myplayer.model.LoginAccount
 import com.example.myplayer.model.chat.ChatMessage
 import com.example.myplayer.userInfo.isConnected
 import kotlinx.coroutines.delay
@@ -69,6 +73,7 @@ import java.net.UnknownHostException
 
 private val TAG = "LoginScreen"
 
+@SuppressLint("CoroutineCreationDuringComposition")
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
@@ -90,6 +95,23 @@ fun LoginScreen(
     var errorMessage by remember { mutableStateOf("") }
     val context = LocalContext.current.applicationContext
 
+    LaunchedEffect(Unit) {
+        CoroutineScope(Dispatchers.IO).launch{
+            try{
+                val dao = DatabaseProvider.getPlayRoomDatabase(context).accountDao()
+                val oldAccount = dao.getLastInsertedAccount()
+                if(oldAccount != null) {
+                    account = oldAccount.account.toString()
+                    password = oldAccount.password.toString()
+                    Log.d("LoginScreen", oldAccount.toString())
+                }
+            }
+            catch (e : Exception)
+            {
+
+            }
+        }
+    }
 
     if (showErrorDialog) {
         AlertDialog(
@@ -245,13 +267,21 @@ fun LoginScreen(
                                             Log.i("loginScreen", data.toString())
                                             Log.i("loginScreen-token", BaseInformation.token)
 
-
+                                            saveAccount(
+                                                context,
+                                                LoginAccount(
+                                                    null,
+                                                    account,
+                                                    password
+                                                )
+                                            )
                                             getUserInfo(friendCoroutineScope,context)
                                             getFriendList(userInfoCoroutineScope,context)
                                             connectToWS(onLogout, context, {
                                                 CoroutineScope(Dispatchers.Main).launch{
                                                     Toast.makeText(context, "已登录！", Toast.LENGTH_SHORT).show()
                                                 }
+
                                                 isWSConnected = true
                                                 isConnected = true
                                                 onLoginSuccess()
@@ -488,18 +518,18 @@ suspend fun connectToWS(
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             super.onClosed(webSocket, code, reason)
             Log.i(TAG, "连接正常关闭 code:$code reason:$reason")
-            CoroutineScope(Dispatchers.Main).launch{
-                Toast.makeText(context, "已离线！", Toast.LENGTH_SHORT).show()
-            }
+//            CoroutineScope(Dispatchers.Main).launch{
+//                Toast.makeText(context, "已离线！", Toast.LENGTH_SHORT).show()
+//            }
             isConnected = false
             restartWebSocketWithDelay()
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             super.onFailure(webSocket, t, response)
-            CoroutineScope(Dispatchers.Main).launch{
-                Toast.makeText(context, "离线异常！", Toast.LENGTH_SHORT).show()
-            }
+//            CoroutineScope(Dispatchers.Main).launch{
+//                Toast.makeText(context, "离线异常！", Toast.LENGTH_SHORT).show()
+//            }
             Log.e(TAG, "连接异常断开", t)
             isConnected = false
             restartWebSocketWithDelay()
@@ -518,16 +548,18 @@ suspend fun connectToWS(
                 // 3秒后重连，避免频繁重连导致资源浪费或被封禁
                 Handler(Looper.getMainLooper()).postDelayed({
                     Log.d("LoginScreen", "开始重连登录WebSocket")
-                    CoroutineScope(Dispatchers.Main).launch{
-                        Toast.makeText(context, "正在重新登录", Toast.LENGTH_SHORT)
-                            .show()
-                    }
+//                    CoroutineScope(Dispatchers.Main).launch{
+//                        Toast.makeText(context, "正在重新登录", Toast.LENGTH_SHORT)
+//                            .show()
+//                    }
                     CoroutineScope(Dispatchers.IO).launch {
                         connectToWS(onLogout,
                             context, {
-                                CoroutineScope(Dispatchers.Main).launch {
-                                Toast.makeText(context, "已重新登录！", Toast.LENGTH_SHORT).show()
-                            }}
+//                                CoroutineScope(Dispatchers.Main).launch {
+//                                Toast.makeText(context, "已重新登录！", Toast.LENGTH_SHORT).show()
+//                              }
+                                isConnected = true
+                            }
                         )
                     }
                 }, 3000)
@@ -537,9 +569,9 @@ suspend fun connectToWS(
                     Toast.makeText(context, "重新登录异常！", Toast.LENGTH_SHORT)
                         .show()
                 }
+                isConnected = false
             }
         }
-
     }
     webSocketManager?.connect(listener)
 }

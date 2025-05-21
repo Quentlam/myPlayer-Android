@@ -76,18 +76,17 @@ fun HomeScreen(onLogout: () -> Unit) {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("friends") { FriendsScreen() }
-            composable("chat") { ChatScreen() }
+            composable("chat") { ChatScreen(
+                onEnterChatDetialScreen = { hideBottomBar = true },
+                onExitChatDetialScreen = { hideBottomBar = false }
+            ) }
             composable("Me") { SettingScreen(onLogout) }
             composable("playroom") {
                 PlayroomNavigation(
                     onEnterRoom = {
-                        // 进入房间，隐藏底部导航栏
-                        windowInsetsController?.hide(WindowInsetsCompat.Type.navigationBars())
                         hideBottomBar = true
                     },
                     onExitRoom = {
-                        // 退出房间，显示底部导航栏
-                        windowInsetsController?.show(WindowInsetsCompat.Type.navigationBars())
                         hideBottomBar = false
                     }
                 )
