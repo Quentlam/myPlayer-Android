@@ -4,9 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -53,10 +53,11 @@ private fun isSupportedFormat(url: String): Boolean {
     return supportedFormats.any { url.lowercase().endsWith(it) }
 }
 
+@androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(UnstableApi::class)
 @Composable
 fun PlayerWithFloatingControls(
-    context: Context,
+    context: Context = LocalContext.current,
     videoUrl: String,
     roomId: String,
     onBack: () -> Unit,
@@ -71,12 +72,15 @@ fun PlayerWithFloatingControls(
     val configuration = LocalConfiguration.current
     val orientation = configuration.orientation
     val activity = (context as? Activity)
+
     // 监听生命周期，在Activity销毁时恢复竖屏
     DisposableEffect(Unit) {
         onDispose {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            resetSystemUI(activity)
         }
     }
+
     // 处理返回按钮逻辑
     BackHandler(enabled = true) {
         if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -136,6 +140,18 @@ fun PlayerWithFloatingControls(
         }
     }
 
+    // 全屏时设置沉浸式，非全屏恢复状态
+    LaunchedEffect(orientation) {
+        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            setFullScreen(activity)
+        } else {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            resetSystemUI(activity)
+        }
+        controlsVisible = false
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -144,17 +160,24 @@ fun PlayerWithFloatingControls(
                 interactionSource = remember { MutableInteractionSource() }
             ) {
                 controlsVisible = !controlsVisible
-                Log.d("exoPlayer", "controlsVisible = $controlsVisible") // 打印状态
+                Log.d("exoPlayer", "controlsVisible = $controlsVisible")
                 if (controlsVisible) startAutoHideTimer()
             }
     ) {
         AndroidView(
-            factory = {
-                PlayerView(it).apply {
+            factory = { context ->
+                PlayerView(context).apply {
                     player = exoPlayer
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL  // 或者 RESIZE_MODE_FILL，根据需求调试
                 }
+            },
+            update = { playerView ->
+                playerView.resizeMode = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                    AspectRatioFrameLayout.RESIZE_MODE_FILL
+                } else {
+                    AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
+                playerView.requestLayout()
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -163,12 +186,9 @@ fun PlayerWithFloatingControls(
             visible = controlsVisible,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
+            Column(modifier = Modifier.fillMaxSize()) {
                 // 顶部栏
                 Box(
                     modifier = Modifier
@@ -188,7 +208,7 @@ fun PlayerWithFloatingControls(
                             } else {
                                 onBack()
                             }
-                        }, modifier = Modifier.size(36.dp))  {
+                        }, modifier = Modifier.size(36.dp)) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "返回",
@@ -199,41 +219,40 @@ fun PlayerWithFloatingControls(
                         Text(
                             text = "房间ID：$roomId",
                             color = Color.White,
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight  = FontWeight.Bold),
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                // 中间区域 - 使用权重填充剩余空间
+                // 中间区域 - 播放控制按钮
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .clickable { controlsVisible = !controlsVisible }
                 ) {
-                    // 播放控制按钮居中
                     Row(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalArrangement = Arrangement.spacedBy(40.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // 快退按钮
+                        // 快退15秒
                         IconButton(
                             onClick = {
-                                val newPos = (exoPlayer.currentPosition  - 15_000).coerceAtLeast(0L)
+                                val newPos = (exoPlayer.currentPosition - 15_000).coerceAtLeast(0L)
                                 exoPlayer.seekTo(newPos)
                             },
                             modifier = Modifier.size(60.dp)
                         ) {
-                            Text("< 15s", color = Color.White)
+                            Text("<< 15s", color = Color.White)
                         }
 
-                        // 播放/暂停按钮
+                        // 播放/暂停
                         IconButton(
                             onClick = {
-                                if (exoPlayer.isPlaying)  {
+                                if (exoPlayer.isPlaying) {
                                     exoPlayer.pause()
                                     isPlaying = false
                                 } else {
@@ -251,16 +270,16 @@ fun PlayerWithFloatingControls(
                             )
                         }
 
-                        // 快进按钮
+                        // 快进15秒
                         IconButton(
                             onClick = {
-                                val duration = exoPlayer.duration.takeIf  { it > 0 } ?: Long.MAX_VALUE
-                                val newPos = (exoPlayer.currentPosition  + 15_000).coerceAtMost(duration)
+                                val duration = exoPlayer.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+                                val newPos = (exoPlayer.currentPosition + 15_000).coerceAtMost(duration)
                                 exoPlayer.seekTo(newPos)
                             },
                             modifier = Modifier.size(60.dp)
                         ) {
-                            Text("15s >", color = Color.White)
+                            Text("15s >>", color = Color.White)
                         }
                     }
                 }
@@ -299,7 +318,7 @@ fun PlayerWithFloatingControls(
     }
 }
 
-@kotlin.OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerProgressBar(
     exoPlayer: ExoPlayer,
@@ -344,7 +363,7 @@ fun PlayerProgressBar(
                 activeTrackColor = Color.White,
                 inactiveTrackColor = Color.Gray
             ),
-            thumb = { sliderState ->
+            thumb = { _ ->
                 Icon(
                     imageVector = Icons.Default.AirportShuttle,
                     contentDescription = "滑块",
@@ -357,8 +376,16 @@ fun PlayerProgressBar(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = formatTime(currentPosition), color = Color.White, fontSize = MaterialTheme.typography.bodySmall.fontSize)
-            Text(text = formatTime(duration), color = Color.White, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+            Text(
+                text = formatTime(currentPosition),
+                color = Color.White,
+                fontSize = MaterialTheme.typography.bodySmall.fontSize
+            )
+            Text(
+                text = formatTime(duration),
+                color = Color.White,
+                fontSize = MaterialTheme.typography.bodySmall.fontSize
+            )
         }
     }
 }
@@ -368,4 +395,21 @@ fun formatTime(millis: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return String.format("%02d:%02d", minutes, seconds)
+}
+
+/** 设置沉浸式全屏，隐藏状态栏和导航栏 */
+private fun setFullScreen(activity: Activity?) {
+    activity?.window?.decorView?.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+}
+
+/** 恢复系统UI显示 */
+private fun resetSystemUI(activity: Activity?) {
+    activity?.window?.decorView?.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
 }

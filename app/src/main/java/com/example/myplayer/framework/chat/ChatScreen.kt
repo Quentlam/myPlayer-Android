@@ -243,60 +243,7 @@ private fun ChatDetailScreen(
     }
 
     Scaffold(
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = friend?.u_name ?: "聊天",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f)
-                )
-                // 如果有需要，可以加右侧其他操作按钮
-            }
-
-            // 聊天内容列表，填满剩余空间
-            LazyColumn(
-                modifier = Modifier,
-                state = listState
-            ) {
-                items(chatMessages) { msg ->
-                    val isMyMessage = msg.sender_id == u_id
-                    var avatarUrl : String ? = null
-                    if(isMyMessage) {
-                        avatarUrl = userInfo.u_avatar
-                    }
-                    else avatarUrl = friend!!.u_avatar
-                    if (msg.isSent == true) {
-                        msg.content?.let { content ->
-                            msg.time?.let { time ->
-                                ChatBubble(
-                                    message = content, isMyMessage = isMyMessage, time = time,
-                                    avatarUrl = avatarUrl
-                                )
-                            }
-                        }
-                    } else {
-                        msg.content?.let { content ->
-                            msg.time?.let { time ->
-                                PendingChatBubble(message = content, isMyMessage = isMyMessage, time = time, avatarUrl = avatarUrl)
-                            }
-                        }
-                    }
-                }
-            }
+        bottomBar = {
             // 底部消息输入栏
             Row(
                 modifier = Modifier
@@ -364,6 +311,61 @@ private fun ChatDetailScreen(
                     interactionSource = remember { MutableInteractionSource() },
                 ) {
                     Text("发送")
+                }
+            }
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = friend?.u_name ?: "聊天",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                // 如果有需要，可以加右侧其他操作按钮
+            }
+
+            // 聊天内容列表，填满剩余空间
+            LazyColumn(
+                modifier = Modifier,
+                state = listState
+            ) {
+                items(chatMessages) { msg ->
+                    val isMyMessage = msg.sender_id == u_id
+                    var avatarUrl : String ? = null
+                    if(isMyMessage) {
+                        avatarUrl = userInfo.u_avatar
+                    }
+                    else avatarUrl = friend!!.u_avatar
+                    if (msg.isSent == true) {
+                        msg.content?.let { content ->
+                            msg.time?.let { time ->
+                                ChatBubble(
+                                    message = content, isMyMessage = isMyMessage, time = time,
+                                    avatarUrl = avatarUrl
+                                )
+                            }
+                        }
+                    } else {
+                        msg.content?.let { content ->
+                            msg.time?.let { time ->
+                                PendingChatBubble(message = content, isMyMessage = isMyMessage, time = time, avatarUrl = avatarUrl)
+                            }
+                        }
+                    }
                 }
             }
         }

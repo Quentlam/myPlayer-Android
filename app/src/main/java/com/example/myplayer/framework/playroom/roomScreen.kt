@@ -731,7 +731,7 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                             state = listState
                         ) {
                             items(messageList) { message ->
-                                messageElment(message)
+//                                messageElment(message)
                             }
                         }
 

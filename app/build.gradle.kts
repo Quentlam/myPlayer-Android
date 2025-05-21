@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.Packaging
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -61,10 +63,6 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
 
-    // Media3
-    implementation(libs.androidx.media3.exoplayer.hls)
-    implementation(libs.androidx.media3.exoplayer.dash)
-
     val room_version = "2.7.1"
     // Room
     implementation("androidx.room:room-runtime:$room_version")
@@ -100,4 +98,22 @@ dependencies {
 
     //异步加载头像
     implementation("io.coil-kt.coil3:coil-compose:3.2.0")
+
+
+    val media3_version = "1.6.1"
+    // For media playback using ExoPlayer
+    implementation("androidx.media3:media3-exoplayer:$media3_version")
+    // For DASH playback support with ExoPlayer
+    implementation("androidx.media3:media3-exoplayer-dash:$media3_version")
+    // For HLS playback support with ExoPlayer
+    implementation("androidx.media3:media3-exoplayer-hls:$media3_version")
+    // For SmoothStreaming playback support with ExoPlayer
+    implementation("androidx.media3:media3-exoplayer-smoothstreaming:$media3_version")
+    // For RTSP playback support with ExoPlayer
+    implementation("androidx.media3:media3-exoplayer-rtsp:$media3_version")
+    // For MIDI playback support with ExoPlayer (see additional dependency requirements in
+    // https://github.com/androidx/media/blob/release/libraries/decoder_midi/README.md)
+    implementation("androidx.media3:media3-exoplayer-midi:$media3_version")
+    // For scheduling background operations using Jetpack Work's WorkManager with ExoPlayer
+    implementation("androidx.media3:media3-exoplayer-workmanager:$media3_version")
 }
