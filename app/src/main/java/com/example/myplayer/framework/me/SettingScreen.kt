@@ -241,7 +241,7 @@ fun SettingItem(
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium
         )
-        Divider(
+        HorizontalDivider(
             modifier = Modifier.padding(top = 12.dp),
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
         )
