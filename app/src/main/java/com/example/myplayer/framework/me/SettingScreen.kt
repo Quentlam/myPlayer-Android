@@ -63,7 +63,7 @@ fun SettingScreen(onLogout: () -> Unit) {
     var avatarUri by remember { mutableStateOf<Uri?>(if (userInfo.u_avatar.isNotEmpty()) Uri.parse(userInfo.u_avatar) else null) }
     var showToast by remember { mutableStateOf(false) }
     var toastMessage by remember { mutableStateOf("") }
-    val context = LocalContext.current as Activity
+    val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
 

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 
 object userInfo {
+    var currentFriend by  mutableStateOf("")
     var u_name by  mutableStateOf("")
     var u_introduction by mutableStateOf("")
     var u_avatar by  mutableStateOf("")

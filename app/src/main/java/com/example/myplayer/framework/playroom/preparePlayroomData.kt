@@ -476,7 +476,7 @@ fun AddNewPlayroom(
     onCancel: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
     var showErrorDialog by remember { mutableStateOf(false) }
     if (showErrorDialog) {
         AlertDialog(
