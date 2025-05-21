@@ -7,14 +7,16 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [
         com.example.myplayer.model.playroom.Playroom::class,
-        com.example.myplayer.model.playroom.PlayroomContent::class
+        com.example.myplayer.model.playroom.PlayroomContent::class,
+        com.example.myplayer.model.LoginAccount::class
                ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class PlayroomDatabase : RoomDatabase() {
     abstract fun playroomDao(): PlayroomDao
     abstract fun playroomContentDao(): PlayroomContentDao
+    abstract fun accountDao(): AccountDao
 }
 
 

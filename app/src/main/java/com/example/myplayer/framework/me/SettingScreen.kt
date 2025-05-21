@@ -64,25 +64,6 @@ fun SettingScreen(onLogout: () -> Unit) {
     var showToast by remember { mutableStateOf(false) }
     var toastMessage by remember { mutableStateOf("") }
     val context = LocalContext.current.applicationContext
-    val scope = rememberCoroutineScope()
-
-
-
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            avatarUri = it
-            val filePath = getRealPathFromUri(context, it)
-            filePath?.let { path ->
-                // 假设 account 是从某个地方获取的用户 ID
-                CoroutineScope(Dispatchers.IO).launch {
-                    updateAvatarUri(this, path, account) // 传入 account 参数
-                }
-                userInfo.u_avatar = path
-            }
-        }
-    }
 
 
     // 显示Toast的函数
@@ -102,33 +83,11 @@ fun SettingScreen(onLogout: () -> Unit) {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // 头像部分
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .align(Alignment.CenterHorizontally)
-                .clickable {
-                    imagePickerLauncher.launch("image/*")
-                }
-        ) {
-            if (avatarUri != null) {
-                Image(
-                    painter = rememberAsyncImagePainter(avatarUri),
-                    contentDescription = "头像",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                    contentDescription = "头像",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-        }
+        AvatarWithEditDialog(
+            avatarUri = avatarUri,
+            onAvatarUriChange = { newUri -> avatarUri = newUri },
+            account = account
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -396,7 +355,7 @@ suspend fun updatesignature(coroutineScope: CoroutineScope, newValuesignature: S
     userInfo.u_introduction = newValuesignature
 }
 
-suspend fun updateAvatarUri(coroutineScope: CoroutineScope, filePath: String, account: String) {
+suspend fun updateAvatarUri(coroutineScope: CoroutineScope,context: Context,filePath: String, account: String) {
     try {
         val file = File(filePath)
         val requestBody = file.asRequestBody("image/*".toMediaTypeOrNull())
@@ -428,12 +387,22 @@ suspend fun updateAvatarUri(coroutineScope: CoroutineScope, filePath: String, ac
             val code = jsonResponse.getInt("code")
             val msg = jsonResponse.getString("msg")
             Log.d("UpdateAvatarResponse", "Code: $code, Message: $msg")
-        } else {
+            CoroutineScope(Dispatchers.Main).launch {
+                Toast.makeText(context, "修改头像成功！", Toast.LENGTH_SHORT).show()
+            }
+        }
+        else {
             Log.e("UpdateAvatarError", "Request failed with code: ${response.code}, body: ${response.body?.string()}")
             Log.e("UpdateAvatarError", "Request failed with code: ${response.code}")
+            CoroutineScope(Dispatchers.Main).launch{
+                Toast.makeText(context, "修改头像失败！${response.code}", Toast.LENGTH_SHORT).show()
+            }
         }
     } catch (e: Exception) {
         Log.e("UpdateAvatarError", "Exception: ${e.localizedMessage}")
+        CoroutineScope(Dispatchers.Main).launch {
+            Toast.makeText(context, "修改头像失败！${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 }
 
@@ -510,5 +479,114 @@ fun sha256(input: String): String {
         hexString.toString()
     } catch (e: NoSuchAlgorithmException) {
         throw RuntimeException("SHA-256 algorithm not found", e)
+    }
+}
+
+
+@Composable
+fun AvatarWithEditDialog(
+    avatarUri: Uri?,
+    onAvatarUriChange: (Uri?) -> Unit,
+    account: String
+) {
+    val context = LocalContext.current.applicationContext
+    val scope = rememberCoroutineScope()
+
+    var showAvatarDialog by remember { mutableStateOf(false) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            onAvatarUriChange(it)
+            val filePath = getRealPathFromUri(context, it)
+            filePath?.let { path ->
+                scope.launch(Dispatchers.IO) {
+                    updateAvatarUri(this, context,path, account)
+                }
+            }
+        }
+        showAvatarDialog = false
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable { showAvatarDialog = true }
+                .align(Alignment.CenterHorizontally),
+            contentAlignment = Alignment.Center
+        ) {
+            if (avatarUri != null) {
+                Image(
+                    painter = rememberAsyncImagePainter(avatarUri),
+                    contentDescription = "头像",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                    contentDescription = "头像",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+    }
+
+
+    if (showAvatarDialog) {
+        AlertDialog(
+            onDismissRequest = { showAvatarDialog = false },
+            title = null,
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(200.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                    ) {
+                        if (avatarUri != null) {
+                            Image(
+                                painter = rememberAsyncImagePainter(avatarUri),
+                                contentDescription = "头像大图",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                                contentDescription = "头像大图",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(onClick = {
+                        imagePickerLauncher.launch("image/*")
+                    }) {
+                        Text(text = "修改头像")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAvatarDialog = false }) {
+                    Text("关闭")
+                }
+            }
+        )
     }
 }

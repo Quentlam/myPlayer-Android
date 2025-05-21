@@ -16,6 +16,7 @@
         <activity
             android:name=".MainActivity"
             android:configChanges="navigation|screenLayout|orientation|screenSize|keyboardHidden|layoutDirection|smallestScreenSize|density"
+
             android:screenOrientation="portrait"
             android:supportsPictureInPicture="true"
 
