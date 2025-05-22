@@ -3,6 +3,8 @@ package com.example.myplayer
 import SHA256Util
 import android.annotation.SuppressLint
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -65,6 +67,7 @@ import com.example.myplayer.model.DatabaseProvider
 import com.example.myplayer.model.LoginAccount
 import com.example.myplayer.model.chat.ChatMessage
 import com.example.myplayer.userInfo.isConnected
+import com.example.myplayer.userInfo.isLogin
 import kotlinx.coroutines.delay
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -281,7 +284,6 @@ fun LoginScreen(
                                                 CoroutineScope(Dispatchers.Main).launch{
                                                     Toast.makeText(context, "已登录！", Toast.LENGTH_SHORT).show()
                                                 }
-
                                                 isWSConnected = true
                                                 isConnected = true
                                                 onLoginSuccess()
@@ -466,6 +468,8 @@ suspend fun getFriendList(coroutineScope: CoroutineScope,context: Context){
         }
     }
 }
+
+
 var webSocketManager: WebSocketManager? = null;
 suspend fun connectToWS(
     onLogout: () -> Unit,
@@ -477,15 +481,13 @@ suspend fun connectToWS(
         override fun onMessage(webSocket: WebSocket, text: String) {
             val type = object : TypeToken<WebSocketResponse>() {}.type
             val data = Gson().fromJson<WebSocketResponse>(text, type)
-            if(data.engaged){ //如果被占线
+            if (data.engaged) { //如果被占线
                 webSocketManager?.disconnect(onLogout)
                 Log.i(TAG, "WebSocket断开连接")
-            }
-            else{
-                if(data.system){
+            } else {
+                if (data.system) {
 
-                }
-                else if(data.message){
+                } else if (data.message) {
                     if (!data.content.isNullOrEmpty()) {
                         CoroutineScope(Dispatchers.IO).launch {
                             saveChatMessage(
@@ -501,9 +503,8 @@ suspend fun connectToWS(
                                 )
                             )
                         }
-                        if(userInfo.currentFriend != data.sender)
-                        {
-                            CoroutineScope(Dispatchers.Default).launch{
+                        if (userInfo.currentFriend != data.sender) {
+                            CoroutineScope(Dispatchers.Default).launch {
                                 //Toast.makeText(context, "收到来自${data.sender_name}的消息: ${data.content}", Toast.LENGTH_SHORT).show()
                                 val notifyMsg = "收到来自${data.sender_name}的消息: ${data.content}"
                                 GlobalMessageNotifier.notify(notifyMsg)
@@ -515,6 +516,7 @@ suspend fun connectToWS(
             }
             Log.d(TAG, data.toString())
         }
+
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             super.onClosed(webSocket, code, reason)
             Log.i(TAG, "连接正常关闭 code:$code reason:$reason")
@@ -544,36 +546,48 @@ suspend fun connectToWS(
         }
 
         private fun restartWebSocketWithDelay() {
-            try {
-                // 3秒后重连，避免频繁重连导致资源浪费或被封禁
-                Handler(Looper.getMainLooper()).postDelayed({
-                    Log.d("LoginScreen", "开始重连登录WebSocket")
-//                    CoroutineScope(Dispatchers.Main).launch{
-//                        Toast.makeText(context, "正在重新登录", Toast.LENGTH_SHORT)
-//                            .show()
-//                    }
-                    CoroutineScope(Dispatchers.IO).launch {
-                        connectToWS(onLogout,
-                            context, {
-//                                CoroutineScope(Dispatchers.Main).launch {
-//                                Toast.makeText(context, "已重新登录！", Toast.LENGTH_SHORT).show()
-//                              }
-                                isConnected = true
-                            }
-                        )
+            isConnected = false
+            if (isLogin) {
+                try {
+                    // 3秒后重连，避免频繁重连导致资源浪费或被封禁
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        Log.d("LoginScreen", "开始重连登录WebSocket")
+                        CoroutineScope(Dispatchers.IO).launch {
+                            connectToWS(onLogout,
+                                context, {
+                                    isConnected = true
+                                }
+                            )
+                        }
+                    }, 3000)
+                } catch (e: Exception) {
+                    Log.e("LoginScreen", "重连登录WebSocket失败:${e.message}")
+                    CoroutineScope(Dispatchers.Main).launch {
+                        Toast.makeText(context, "重新登录异常！", Toast.LENGTH_SHORT)
+                            .show()
                     }
-                }, 3000)
-            } catch (e: Exception) {
-                Log.e("LoginScreen", "重连登录WebSocket失败:${e.message}")
-                CoroutineScope(Dispatchers.Main).launch{
-                    Toast.makeText(context, "重新登录异常！", Toast.LENGTH_SHORT)
-                        .show()
+                    isConnected = false
                 }
-                isConnected = false
             }
         }
     }
     webSocketManager?.connect(listener)
+
+
+
+    val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onLost(network: Network) {
+            isConnected = false
+            webSocketManager?.disconnect {
+                // 处理断网登出逻辑
+            }
+        }
+        override fun onAvailable(network: Network) {
+            // 网络恢复时，尝试重连
+        }
+    }
+    connectivityManager.registerDefaultNetworkCallback(networkCallback)
 }
 
 

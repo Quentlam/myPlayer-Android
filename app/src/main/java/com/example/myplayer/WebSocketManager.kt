@@ -7,6 +7,7 @@ import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
 import android.util.Log
 import androidx.navigation.NavHostController
+import com.example.myplayer.userInfo.isConnected
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -17,8 +18,8 @@ private val TAG = "WebSocketManager"
 // 在Friend数据类定义之后添加：
 private val okHttpClient by lazy {
     OkHttpClient.Builder()
-        .readTimeout(3, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
+        .pingInterval(15, TimeUnit.SECONDS)  // okhttp 支持自动 ping
         .build()
 }
 
@@ -32,28 +33,19 @@ class WebSocketManager(private val url: String) {
         webSocket = okHttpClient.newWebSocket(request, listener)
     }
 
-    fun sendMessage(message: String): Boolean? {
+    fun sendMessage(message: String){
         try{
-            return webSocket?.send(message)
+            webSocket?.send(message)
         }
         catch (e:Exception) {
-            Log.e("WebSocketManager","信息发送失败！${e.message}")
-            return false
+            Log.e("WebSocketManager","信息发送异常！${e.message}")
         }
-        return false
     }
 
     fun disconnect(onLogout: () -> Unit) {
         val state: Boolean = webSocket!!.close(1000, "Normal closure")
-        if(state){
-            // 清空用户信息
-            userInfo.u_name = ""
-            userInfo.u_introduction = ""
-            userInfo.u_avatar = ""
-            userInfo.u_id = ""
-            userInfo.friendList = mutableListOf()
-            onLogout()
-        }
+        onLogout()
         Log.i(TAG, "退出登录${state}")
     }
 }
+

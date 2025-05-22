@@ -22,9 +22,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -75,6 +77,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import androidx.compose.material3.*
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.myplayer.framework.chat.AvatarImage
 
 val messageHandler = object : PlayroomMessageHandler {
     override fun onUserJoined(context : Context,msg: JoinMessage) {//如果加入了，就需要给房间的视频连接
@@ -180,6 +183,8 @@ val messageHandler = object : PlayroomMessageHandler {
                     content.fromUserId,
                     content.u_name,
                     content.content,
+                    content.u_avatar,
+                    //content
                     ZonedDateTime.now(ZoneId.of("Asia/Shanghai"))
                         .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))
                 )
@@ -728,14 +733,32 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                 Box(modifier = Modifier.weight(1f)) {
                     when (currentTab) {
                         0 -> LazyColumn(
-                            state = listState
+                            state = listState,
+                            contentPadding = PaddingValues(vertical = 8.dp) // 给列表顶部和底部一些空间
                         ) {
+
                             items(messageList) { message ->
-//                                messageElment(message)
+                                val isMyMessage = message.u_id == userInfo.u_id
+                                val avatarUrl : String
+                                if(isMyMessage)
+                                {
+                                    avatarUrl = userInfo.u_avatar
+                                }
+                                else
+                                {
+                                    avatarUrl = message.u_avatar
+                                }
+                                messageElement(
+                                    message,
+                                    isMyMessage = isMyMessage,
+                                    avatarUrl = avatarUrl
+                                )
                             }
                         }
 
-                        1 -> LazyColumn {
+                        1 -> LazyColumn(
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        ) {
                             items(currentMemberList) { member ->
                                 memberElement(member)
                             }
@@ -773,28 +796,34 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val customTextSelectionColors = TextSelectionColors(
-                    handleColor = Color.Red,
-                    backgroundColor = Color.LightGray.copy(alpha = 0.4f)
+                    handleColor = MaterialTheme.colorScheme.primary, // 使用主题色
+                    backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) // 使用主题色半透明
                 )
 
                 CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
                     TextField(
-                        value = messageInput,
-                        onValueChange = { messageInput = it },
+                        value = messageInput, // 现在 messageInput 是 TextFieldValue 类型，匹配
+                        onValueChange = { newValue -> // newValue 是 TextFieldValue 类型，匹配
+                            messageInput = newValue // 更新状态
+                        },
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp)   // 高度显式设定，略小于Row高度，避免挤压
+                            .height(56.dp)   // 高度显式设定
                             .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(12.dp)
+                                // 使用背景色和圆角，这是 TextField 的外部容器样式
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = RoundedCornerShape(26.dp) // 更大的圆角
                             )
                             .border(
+                                // 添加边框，通常与背景使用相同的圆角，以达到胶囊形状效果
                                 width = 1.dp,
                                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(26.dp) // 边框圆角与背景一致
                             )
-                            .padding(horizontal = 12.dp),
-                        placeholder = {
+                                // 注意：这里的 padding 是应用于整个 TextField Composable 的外部，
+                                // 而不是文本内容内部的 padding。
+                                // .padding(horizontal = 12.dp), // 这个 padding 会把整个 TextField 往里推
+                                ,placeholder = {
                             Text(
                                 text = "输入弹幕...",
                                 fontSize = 14.sp,
@@ -803,24 +832,84 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                         },
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(
-                            fontSize = 14.sp,    // 放大字体
+                            fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 30.sp   // 设置行高
                         ),
-                        shape = RoundedCornerShape(12.dp),
                         colors = TextFieldDefaults.colors(
+                            // 文本颜色 (根据需要修改或使用默认)
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                            errorTextColor = MaterialTheme.colorScheme.error,
+
+                            // 容器颜色 - 根据新的参考，这些是参数，设置为透明
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            errorContainerColor = Color.Transparent,
+
+                            // 光标颜色
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                            errorCursorColor = MaterialTheme.colorScheme.error,
+
+                            // 文本选择颜色 (使用本地主题的) - 参数名是 selectionColors
+                            selectionColors = LocalTextSelectionColors.current,
+
+                            // 指示线颜色 - 设置为透明以移除指示线
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
                             disabledIndicatorColor = Color.Transparent,
-                            errorIndicatorColor = Color.Transparent
+                            errorIndicatorColor = Color.Transparent,
+
+                            // Icon 颜色 (如果使用了 leading/trailing icons) - 根据需要修改或使用默认
+                            focusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                            errorLeadingIconColor = MaterialTheme.colorScheme.error,
+                            focusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                            errorTrailingIconColor = MaterialTheme.colorScheme.error,
+
+                            // Label 颜色 (如果使用了 label) - 根据需要修改或使用默认
+                            // focusedLabelColor = ..., unfocusedLabelColor = ..., etc.
+                            // (此处省略，如果您不使用 label，可以不设置或依赖默认)
+
+                            // Placeholder 颜色 - 根据您的需求修改
+                            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant, // 占位符颜色
+                            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                            errorPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+
+                            // Supporting Text 颜色 (如果使用了 supportingText) - 根据需要修改或使用默认
+                            // focusedSupportingTextColor = ..., unfocusedSupportingTextColor = ..., etc.
+                            focusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unfocusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                            errorSupportingTextColor = MaterialTheme.colorScheme.error,
+
+
+                            // Prefix/Suffix 颜色 (如果使用了 prefix/suffix) - 根据需要修改或使用默认
+                            // focusedPrefixColor = ..., unfocusedPrefixColor = ..., etc.
+                            focusedPrefixColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unfocusedPrefixColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledPrefixColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                            errorPrefixColor = MaterialTheme.colorScheme.error,
+                            focusedSuffixColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unfocusedSuffixColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledSuffixColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                            errorSuffixColor = MaterialTheme.colorScheme.error,
+
+                            // *** 注意：根据您最新的参考，内容内边距参数不再这里！***
+                            // focusedContentPadding = ..., unfocusedContentPadding = ..., etc. // 移除这些行
                         )
                     )
+
                 }
 
-                Button(
-                    onClick =  {
+                // 发送按钮 (改为图标按钮)
+                IconButton(
+                    onClick = {
                         if (messageInput.isNotBlank()) {
                             scope.launch {
                                 try {
@@ -831,11 +920,12 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                                         put("u_name", userInfo.u_name)
                                         put("content", messageInput)
                                     }.toString()
-                                    playRoomWebSocketManager?.sendMessage(wsComStr)
+                                    playRoomWebSocketManager?.sendMessage(wsComStr) // 假设 sendMessage 存在
                                     Log.d(
                                         "PlayroomWebSocketManager",
                                         "本地弹幕信息发送成功！：${wsComStr}"
                                     )
+                                    // 立即在本地显示自己的消息，提供更好的用户体验
                                     savePlayroomMessage(
                                         context,
                                         PlayroomContent(
@@ -844,6 +934,7 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                                             userInfo.u_id,
                                             userInfo.u_name,
                                             messageInput,
+                                            userInfo.u_avatar,
                                             ZonedDateTime.now(ZoneId.of("Asia/Shanghai"))
                                                 .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))
                                         )
@@ -854,35 +945,34 @@ fun roomScreen(room : Playroom,onBack: () -> Unit) {
                                         "PlayroomWebSocketManager",
                                         "本地弹幕信息发送失败！：${e.message}"
                                     )
+                                    // 可以显示一个Toast或其他错误提示
+                                    Toast.makeText(context, "发送失败", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }
                     },
                     modifier = Modifier
-                        .height(40.dp)
-                        .widthIn(min = 72.dp)
-                        .align(Alignment.CenterVertically),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
-                    interactionSource = remember { MutableInteractionSource() },
+                        .size(52.dp) // 图标按钮尺寸
+                        .background(
+                            // *** 将背景颜色修改为 surfaceContainerHigh ***
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = CircleShape // 圆形按钮
+                        ),
+                    enabled = messageInput.isNotBlank() // 输入框有内容时才可点击 (使用 .text)
                 ) {
-                    Text(
-                        "发送",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimary
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "发送消息",
+                        tint = MaterialTheme.colorScheme.onPrimary // 图标颜色
                     )
                 }
             }
 
 
+
         }
     }
 }
-
 
 
 @Composable
@@ -894,104 +984,147 @@ fun RequestItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 8.dp, horizontal = 16.dp), // 添加水平padding
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row()
-        {
-
-            // 左侧显示申请者信息
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = request.inviter_name,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = "ID: ${request.inviter}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // 右侧按钮
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onApprove,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text("通过")
-                }
-
-                Button(
-                    onClick = onReject,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("拒绝")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun messageElment(message : PlayroomContent)
-{
-    Box(
-        modifier = Modifier
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-            .fillMaxWidth()
-    ) {
+        // 左侧显示申请者信息
         Column(
-            modifier = Modifier
-                .background(
-                    color = if (message.u_id == userInfo.u_id)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .padding(8.dp)
-                // 修正：使用 alignBy 而不是 align
-                .align(if (message.u_id == userInfo.u_id) Alignment.CenterEnd else Alignment.CenterStart)
-                .widthIn(max = 280.dp)
+            modifier = Modifier.weight(1f).padding(end = 8.dp) // 添加右边距
         ) {
             Text(
-                text = if (message.u_id == userInfo.u_id) "你" else message.u_name,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (message.u_id == userInfo.u_id)
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                text = request.inviter_name,
+                style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                text = message.content,
+                text = "ID: ${request.inviter}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (message.u_id == userInfo.u_id)
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 4.dp)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = message.time,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (message.u_id == userInfo.u_id)
-                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .align(Alignment.End)  // 这里的 align 是在 Column 中使用，所以保持不变
-            )
+        }
+
+        // 右侧按钮
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onApprove,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                shape = RoundedCornerShape(8.dp) // 添加圆角
+            ) {
+                Text("通过")
+            }
+
+            Button(
+                onClick = onReject,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                ),
+                shape = RoundedCornerShape(8.dp) // 添加圆角
+            ) {
+                Text("拒绝")
+            }
         }
     }
 }
+
+// 消息元素 Composable，包含姓名、内容、头像和时间
+@Composable
+fun messageElement(message: PlayroomContent, isMyMessage: Boolean, avatarUrl: String?) {
+    // 主体 Column 包含气泡、头像和时间
+    Column(
+        // 垂直排列气泡块和头像时间块
+        horizontalAlignment = Alignment.End
+    )
+    {
+        // 外层 Row 控制左右对齐
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp), // 消息整体的垂直/水平间距
+            horizontalArrangement = if (isMyMessage) Arrangement.End else Arrangement.Start, // 控制消息靠左还是靠右
+            verticalAlignment = Alignment.Bottom // 确保头像和时间行与气泡底部对齐
+        ) {
+            // 主体 Column 包含气泡、头像和时间
+            Column(
+                // 垂直排列气泡块和头像时间块
+                horizontalAlignment = if (isMyMessage) Alignment.End else Alignment.Start // 控制头像和时间行的水平对齐
+            ) {
+                // 名字文本
+                Text(
+                    text = message.u_name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), // 名字颜色
+                )
+                // 包含头像和时间的 Row，位于气泡下方
+                Row(
+                    modifier = Modifier
+                        // 对齐到 Column 的 Start/End
+                        .align(if (isMyMessage) Alignment.End else Alignment.Start)
+                        .padding(top = 2.dp), // 头像/时间与气泡之间的间距
+                    verticalAlignment = Alignment.Bottom // 确保头像和时间底部对齐
+                ) {
+                    // 气泡本身 (使用 Box)
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                // 根据发送者设置背景颜色
+                                color = if (isMyMessage)
+                                    MaterialTheme.colorScheme.primary // 我的消息颜色 (根据图片，更像 primary)
+                                else MaterialTheme.colorScheme.surfaceVariant, // 对方消息颜色
+                                // 根据发送者设置圆角形状 (尖角朝向头像一侧)
+                                shape = RoundedCornerShape(
+                                    topStart = 16.dp, // 左上角
+                                    topEnd = 16.dp,   // 右上角
+                                    bottomStart = if (isMyMessage) 16.dp else 4.dp, // 左下角：我的消息圆角，对方消息小圆角/尖角
+                                    bottomEnd = if (isMyMessage) 4.dp else 16.dp    // 右下角：我的消息小圆角/尖角，对方消息圆角
+                                )
+                            )
+                            // 气泡内部的内边距，用于包裹文本
+                            .padding(horizontal = 12.dp, vertical = 8.dp) // 调整内部padding
+                            // 限制气泡的最大宽度
+                            .widthIn(max = 280.dp) // 最大宽度
+                    ) {
+                        Column { // 气泡内的内容：姓名和消息
+                            // 只有对方消息显示姓名
+                            if (!isMyMessage) {
+                                Text(
+                                    text = message.u_name,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary, // 对方姓名颜色
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp)) // 姓名和内容之间的间距
+                            }
+
+                            Text(
+                                text = message.content,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isMyMessage)
+                                    MaterialTheme.colorScheme.onPrimary // 我的消息文本颜色 (与 primary 背景搭配)
+                                else MaterialTheme.colorScheme.onSurface, // 对方消息文本颜色
+                            )
+                        }
+                    }
+                    // 如果是对方消息，头像在时间左边
+                    if (!isMyMessage) {
+                        AvatarImage(avatarUrl)
+                        Spacer(modifier = Modifier.width(4.dp)) // 头像和时间之间的间距
+                    }
+
+                    // 如果是我的消息，头像在时间右边
+                    if (isMyMessage) {
+                        Spacer(modifier = Modifier.width(4.dp)) // 时间和头像之间的间距
+                        AvatarImage(avatarUrl)
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 @Composable
 fun memberElement(member : Member) {
