@@ -630,7 +630,9 @@ fun AddNewPlayroom(
                                 ).sendPostRequest(coroutineScope)
                                 val data = JsonToBaseResponse<String>(response).getResponseData()
                                 Log.i("preparePlayroomData", "创建房间成功！：${data.msg}")
-                                Toast.makeText(context, "创建房间成功！", Toast.LENGTH_SHORT).show()
+                                CoroutineScope(Dispatchers.Main).launch{
+                                    Toast.makeText(context, "创建房间成功！", Toast.LENGTH_SHORT).show()
+                                }
                                 // 创建成功后，重新加载播放室列表
                                 loadAllPlayroom(coroutineScope,context)
                                 // 通知父组件创建成功
@@ -692,7 +694,7 @@ suspend fun connectToPlayroomWS(
             val mainHandler = Handler(Looper.getMainLooper())
             val listener = object : WebSocketListener() {
                 override fun onMessage(webSocket: WebSocket, text: String) {
-
+                    Log.d("preparePlayroomData",text)
                     val msg = try {
                         json.decodeFromString(RoomWebSocketMessage.serializer(), text)
                     } catch (e: Exception) {

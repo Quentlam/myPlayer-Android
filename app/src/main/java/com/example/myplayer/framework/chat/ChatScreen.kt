@@ -43,7 +43,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
-import coil.compose.rememberImagePainter
 import com.example.myplayer.userInfo.isConnected
 import com.example.myplayer.webSocketManager
 import org.json.JSONObject
@@ -53,7 +52,6 @@ import java.time.format.DateTimeFormatter
 import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.rememberAsyncImagePainter
 import com.example.myplayer.model.DatabaseProvider
 import com.example.myplayer.model.chat.ChatMessage
 import com.example.myplayer.userInfo.u_id
@@ -63,9 +61,13 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.ui.text.style.TextAlign
+import coil.compose.rememberImagePainter
 import coil3.compose.AsyncImage
+import coil3.compose.ImagePainter
 
 
 val TAG = "ChatScreen"
@@ -100,7 +102,7 @@ fun ChatScreen(
             val result = getFriendList(coroutineScope)
             result.onSuccess { friendList ->
                 userInfo.friendList = friendList
-                Toast.makeText(context, "刷新好友列表成功！", Toast.LENGTH_SHORT).show()
+                //Toast.makeText(context, "刷新好友列表成功！", Toast.LENGTH_SHORT).show()
             }.onFailure { throwable ->
                 Toast.makeText(context, "刷新好友列表失败！：${throwable.message}", Toast.LENGTH_SHORT).show()
             }
@@ -162,11 +164,13 @@ fun ChatScreen(
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+
                     PullRefreshIndicator(
                         refreshing = isRefreshing,
                         state = pullRefreshState,
                         modifier = Modifier.align(Alignment.TopCenter)
                     )
+
                 }
             }
             ChatScreenState.CHAT_DETAIL -> {
@@ -226,7 +230,6 @@ fun ChatScreen(
 
 
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("UnrememberedMutableState", "UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
@@ -244,11 +247,10 @@ private fun ChatDetailScreen(
     }
     var message by remember { mutableStateOf("") }
     val context = LocalContext.current.applicationContext
-    // 将 Flow 转为 State<List<ChatMessage>>
-    // 注意：根据你的 sendMessageToFriend 返回值变化，这里可能需要调整一下消息发送后的处理逻辑，
-    // 比如失败的消息显示 PendingChatBubble，成功的消息显示 ChatBubble。
-    // 你的代码中已经根据 msg.isSent 判断了，这是正确的。
-    val chatMessages by getChatMessageById(context, u_id,friend!!.u_id)
+
+
+
+    val chatMessages by getChatMessageById(context, u_id, friend!!.u_id)
         .collectAsStateWithLifecycle(initialValue = emptyList())//直接获取Flow并且转换为Status
 
 
@@ -263,161 +265,225 @@ private fun ChatDetailScreen(
         }
     }
 
-    // *** 将整个 Scaffold 内容包裹在 Card 中以实现圆角外观 ***
-    Card(
-        modifier = Modifier
-            .fillMaxSize() // Card 填充可用空间
-            .padding(horizontal = 8.dp, vertical = 16.dp), // 卡片整体的边距
-        shape = RoundedCornerShape(16.dp), // 卡片的圆角
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp) // 可选的阴影
-    ) {
-        Scaffold(
-            // 顶部栏 Header 在 Column 中定义，不需要在 Scaffold 的 topBar 插槽
-            // 底部消息输入栏
-            bottomBar = {
-                Box( // 使用 Box 来设置底部栏的背景色和 imePadding
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        // .imePadding() // 尝试将 imePadding 放在 Row 上，如果不行再放这里
-                        .background(MaterialTheme.colorScheme.surface) // 设置底部栏背景色
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .imePadding() // 放在这里通常能确保整个 Row 随着键盘上移
-                            .height(56.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        TextField(
-                            value = message,
-                            onValueChange = { message = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(56.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .padding(horizontal = 12.dp), // TextField 内部文本的 padding
-                            placeholder = {
-                                Text(
-                                    text = "输入消息",
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
-                            singleLine = true,
-                            textStyle = LocalTextStyle.current.copy(
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                lineHeight = 30.sp
-                            ),
-                            shape = RoundedCornerShape(12.dp), // 虽然外层 Box/Background 已经设了，这里再设一次确保
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                disabledIndicatorColor = Color.Transparent,
-                                errorIndicatorColor = Color.Transparent
-                            )
-                        )
-
-                        // *** 将 Button 替换为 IconButton ***
-                        IconButton(
-                            onClick = {
-                                if (message.isNotBlank()) {
-                                    // onMessageSent 会处理发送逻辑和保存到数据库
-                                    onMessageSent(message)
-                                    message = "" // 清空输入框，无论发送成功与否
-                                }
-                            },
-                            // IconButton 通常不需要显式设置 height/widthIn，它根据内容和 padding 自适应
-                            modifier = Modifier.align(Alignment.CenterVertically),
-                            // IconButton 的颜色通过 tint 设置 Icon 或通过 colors 参数设置
-                            colors = IconButtonDefaults.iconButtonColors(
-                                contentColor = MaterialTheme.colorScheme.primary // 图标颜色
-                            )
-                            // IconButton 不需要 shape, interactionSource
-                        ) {
-                            // *** 使用发送图标 ***
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send, // 使用发送图标
-                                contentDescription = "发送消息"
-                            )
-                        }
-                    }
-                }
-            }
+    Scaffold(
+    ) { innerPadding ->
+        Column(
+            // 这个 Column 填充 Card 的内容区域，并应用 Scaffold 的内边距
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding) // Scaffold 的 padding 会避开 bottomBar
         ) {
-                innerPadding ->
-            Column(
-                // 这个 Column 填充 Card 的内容区域，并应用 Scaffold 的内边距
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding) // Scaffold 的 padding 会避开 bottomBar
-            ) {
-                // 顶部 Header Row
+            //顶部
+            Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
+                    modifier = Modifier.fillMaxSize(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "返回")
                     }
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = friend?.u_name ?: "聊天",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                    // 如果有需要，可以加右侧其他操作按钮
+                    // 占位元素确保右侧不会挤压文字
+                    Spacer(modifier = Modifier.weight(1f))
                 }
+                Text(
+                    text = friend?.u_name ?: "聊天",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
 
-                // 聊天内容列表，填满剩余空间
-                LazyColumn(
-                    modifier = Modifier.weight(1f),  // 占满剩余空间
-                    state = listState
-                ) {
-                    items(chatMessages) { msg ->
-                        val isMyMessage = msg.sender_id == u_id
-                        var avatarUrl : String ? = null
-                        if(isMyMessage) {
-                            avatarUrl = userInfo.u_avatar
-                        }
-                        else avatarUrl = friend!!.u_avatar
-                        // 根据 isSent 决定使用 ChatBubble 还是 PendingChatBubble
-                        if (msg.isSent == true) {
-                            msg.content?.let { content ->
-                                msg.time?.let { time ->
-                                    ChatBubble(
-                                        message = content, isMyMessage = isMyMessage, time = time,
-                                        avatarUrl = avatarUrl ?: "" // 提供默认值或处理 null
-                                    )
-                                }
+            // 中层聊天面板
+            Column(
+                modifier = Modifier
+                    .weight(1f)  // 让中间部分填充剩余空间
+                    .fillMaxWidth()
+            ) {
+            // 聊天内容列表，填满剩余空间
+            LazyColumn(
+                modifier = Modifier.weight(1f),  // 占满剩余空间
+                state = listState
+            ) {
+                items(chatMessages) { msg ->
+                    val isMyMessage = msg.sender_id == u_id
+                    var avatarUrl: String? = null
+                    if (isMyMessage) {
+                        avatarUrl = userInfo.u_avatar
+                    } else {
+                        avatarUrl = friend!!.u_avatar
+                    }
+                    if (avatarUrl == null) {
+                        Log.d("ChatScreen", "无头像")
+                    }
+                    // 根据 isSent 决定使用 ChatBubble 还是 PendingChatBubble
+                    if (msg.isSent == true) {
+                        msg.content?.let { content ->
+                            msg.time?.let { time ->
+                                ChatBubble(
+                                    message = content, isMyMessage = isMyMessage, time = time,
+                                    avatarUrl = avatarUrl ?: "" // 提供默认值或处理 null
+                                )
                             }
-                        } else {
-                            msg.content?.let { content ->
-                                msg.time?.let { time ->
-                                    PendingChatBubble(message = content, isMyMessage = isMyMessage, time = time, avatarUrl = avatarUrl ?: "") // 提供默认值或处理 null
-                                }
+                        }
+                    } else {
+                        msg.content?.let { content ->
+                            msg.time?.let { time ->
+                                PendingChatBubble(
+                                    message = content,
+                                    isMyMessage = isMyMessage,
+                                    time = time,
+                                    avatarUrl = avatarUrl ?: ""
+                                ) // 提供默认值或处理 null
                             }
                         }
                     }
                 }
             }
+
+        }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        //.imePadding() // 放在这里通常能确保整个 Row 随着键盘上移
+                        .height(56.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                        TextField(
+                            value = message, // 现在 messageInput 是 TextFieldValue 类型，匹配
+                            onValueChange = { newValue -> // newValue 是 TextFieldValue 类型，匹配
+                                message = newValue // 更新状态
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)   // 高度显式设定
+                                .background(
+                                    // 使用背景色和圆角，这是 TextField 的外部容器样式
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    shape = RoundedCornerShape(26.dp) // 更大的圆角
+                                )
+                                .border(
+                                    // 添加边框，通常与背景使用相同的圆角，以达到胶囊形状效果
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(26.dp) // 边框圆角与背景一致
+                                )
+                            // 注意：这里的 padding 是应用于整个 TextField Composable 的外部，
+                            // 而不是文本内容内部的 padding。
+                            // .padding(horizontal = 12.dp), // 这个 padding 会把整个 TextField 往里推
+                            ,placeholder = {
+                                Text(
+                                    text = "输入信息...",
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            singleLine = true,
+                            textStyle = LocalTextStyle.current.copy(
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            ),
+                            colors = TextFieldDefaults.colors(
+                                // 文本颜色 (根据需要修改或使用默认)
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                                errorTextColor = MaterialTheme.colorScheme.error,
+
+                                // 容器颜色 - 根据新的参考，这些是参数，设置为透明
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                errorContainerColor = Color.Transparent,
+
+                                // 光标颜色
+                                cursorColor = MaterialTheme.colorScheme.primary,
+                                errorCursorColor = MaterialTheme.colorScheme.error,
+
+                                // 文本选择颜色 (使用本地主题的) - 参数名是 selectionColors
+                                selectionColors = LocalTextSelectionColors.current,
+
+                                // 指示线颜色 - 设置为透明以移除指示线
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent,
+                                errorIndicatorColor = Color.Transparent,
+
+                                // Icon 颜色 (如果使用了 leading/trailing icons) - 根据需要修改或使用默认
+                                focusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                errorLeadingIconColor = MaterialTheme.colorScheme.error,
+                                focusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                errorTrailingIconColor = MaterialTheme.colorScheme.error,
+
+                                // Label 颜色 (如果使用了 label) - 根据需要修改或使用默认
+                                // focusedLabelColor = ..., unfocusedLabelColor = ..., etc.
+                                // (此处省略，如果您不使用 label，可以不设置或依赖默认)
+
+                                // Placeholder 颜色 - 根据您的需求修改
+                                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant, // 占位符颜色
+                                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                errorPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+
+                                // Supporting Text 颜色 (如果使用了 supportingText) - 根据需要修改或使用默认
+                                // focusedSupportingTextColor = ..., unfocusedSupportingTextColor = ..., etc.
+                                focusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unfocusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                errorSupportingTextColor = MaterialTheme.colorScheme.error,
+
+
+                                // Prefix/Suffix 颜色 (如果使用了 prefix/suffix) - 根据需要修改或使用默认
+                                // focusedPrefixColor = ..., unfocusedPrefixColor = ..., etc.
+                                focusedPrefixColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unfocusedPrefixColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledPrefixColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                errorPrefixColor = MaterialTheme.colorScheme.error,
+                                focusedSuffixColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unfocusedSuffixColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledSuffixColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                errorSuffixColor = MaterialTheme.colorScheme.error,
+
+                                // *** 注意：根据您最新的参考，内容内边距参数不再这里！***
+                                // focusedContentPadding = ..., unfocusedContentPadding = ..., etc. // 移除这些行
+                            )
+                        )
+                    // *** 将 Button 替换为 IconButton ***
+                    IconButton(
+                        onClick = {
+                            if (message.isNotBlank()) {
+                                // onMessageSent 会处理发送逻辑和保存到数据库
+                                onMessageSent(message)
+                                message = "" // 清空输入框，无论发送成功与否
+                            }
+                        },
+                        // IconButton 通常不需要显式设置 height/widthIn，它根据内容和 padding 自适应
+                        modifier = Modifier.align(Alignment.CenterVertically),
+                        // IconButton 的颜色通过 tint 设置 Icon 或通过 colors 参数设置
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary // 图标颜色
+                        )
+                        // IconButton 不需要 shape, interactionSource
+                    ) {
+                        // *** 使用发送图标 ***
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send, // 使用发送图标
+                            contentDescription = "发送消息"
+                        )
+                    }
+                }
         }
     }
+
 }
+
+
 
 
 // 简单的聊天气泡 Composable (无姓名)
@@ -455,7 +521,7 @@ fun ChatBubble(
                 Box(
                     modifier = Modifier
                         .background(
-                            color = if (isMyMessage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            color = if (isMyMessage) Color(0xFFFFE6EC) else Color(0xFFF2E8E9),
                             shape = RoundedCornerShape(
                                 topStart = 16.dp,
                                 topEnd = 16.dp,
@@ -468,7 +534,7 @@ fun ChatBubble(
                 ) {
                     Text(
                         text = message,
-                        color = if (isMyMessage) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        color = if (isMyMessage) Color.Black else Color.Black,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -541,7 +607,7 @@ fun PendingChatBubble(
                     modifier = Modifier
                         .background(
                             // 可以使用稍微不同的颜色表示发送失败，或者保持一致
-                            color = if (isMyMessage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            color = if (isMyMessage) Color(0xFFFFE6EC) else Color(0xFFF2E8E9),
                             shape = RoundedCornerShape(
                                 topStart = 16.dp,
                                 topEnd = 16.dp,
@@ -554,7 +620,7 @@ fun PendingChatBubble(
                 ) {
                     Text(
                         text = message,
-                        color = if (isMyMessage) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        color = if (isMyMessage) Color.Black else Color.Black,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -592,13 +658,21 @@ fun PendingChatBubble(
 // 辅助函数：头像 Composable，方便复用
 @Composable
 fun AvatarImage(avatarUrl: String?, modifier: Modifier = Modifier) {
-    AsyncImage(
-        model = avatarUrl,
+    // 头像
+    val imagePainter = rememberImagePainter(
+        data = avatarUrl,
+        builder = {
+            crossfade(true)
+        }
+    )
+    Image(
+        painter = imagePainter,
         contentDescription = "用户头像",
-        modifier = modifier
-            .size(24.dp) // 调整头像大小，根据图片样式看起来比 32dp 略小
+        modifier = Modifier
+            .size(24.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant) // 占位符背景
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentScale = ContentScale.Crop
     )
 }
 
@@ -610,8 +684,7 @@ private fun FriendListView(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        if (isConnected == false) {
-            // 黑色卡片，圆角，带阴影
+        if (!userInfo.isConnected) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -619,6 +692,7 @@ private fun FriendListView(
                 colors = CardDefaults.cardColors(containerColor = Color.Black),
                 shape = RoundedCornerShape(12.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+
             ) {
                 Column(
                     modifier = Modifier
@@ -671,18 +745,20 @@ private fun FriendListItem(friend: UserInfo, onClick: () -> Unit) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // 头像
+        val imagePainter = rememberImagePainter(
+            data = friend.u_avatar,
+            builder = {
+                crossfade(true)
+            }
+        )
         Image(
-            painter = rememberImagePainter(
-                data = friend.u_avatar,
-                builder = {
-                    crossfade(true)
-                }
-            ),
+            painter = imagePainter,
             contentDescription = "用户头像",
-            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(48.dp)
-                .clip(CircleShape)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
         )
         Spacer(Modifier.width(16.dp))
         Text(text = friend.u_name, style = MaterialTheme.typography.bodyLarge)

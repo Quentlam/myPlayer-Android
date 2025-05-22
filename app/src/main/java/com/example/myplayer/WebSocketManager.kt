@@ -18,8 +18,9 @@ private val TAG = "WebSocketManager"
 // 在Friend数据类定义之后添加：
 private val okHttpClient by lazy {
     OkHttpClient.Builder()
+        .readTimeout(3, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
-        .pingInterval(15, TimeUnit.SECONDS)  // okhttp 支持自动 ping
+        .pingInterval(15, TimeUnit.SECONDS)
         .build()
 }
 

@@ -89,7 +89,6 @@ fun LoginScreen(
     var showErrorDialog by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
-    var isWSConnected by remember { mutableStateOf(false) }//是否登录
 
 
     val coroutineScope = rememberCoroutineScope()
@@ -284,8 +283,6 @@ fun LoginScreen(
                                                 CoroutineScope(Dispatchers.Main).launch{
                                                     Toast.makeText(context, "已登录！", Toast.LENGTH_SHORT).show()
                                                 }
-                                                isWSConnected = true
-                                                isConnected = true
                                                 onLoginSuccess()
                                             })
                                         }
@@ -309,9 +306,10 @@ fun LoginScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(50.dp)
+                    ,
                     enabled = !loading,
-                    shape = MaterialTheme.shapes.medium
+                    shape = MaterialTheme.shapes.medium,
                 ) {
                     Text(
                         text = if (loading) "登录中..." else "登录",
@@ -519,34 +517,39 @@ suspend fun connectToWS(
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             super.onClosed(webSocket, code, reason)
+            CoroutineScope(Dispatchers.Main).launch {
+                isConnected = false
+            }
             Log.i(TAG, "连接正常关闭 code:$code reason:$reason")
 //            CoroutineScope(Dispatchers.Main).launch{
 //                Toast.makeText(context, "已离线！", Toast.LENGTH_SHORT).show()
 //            }
-            isConnected = false
             restartWebSocketWithDelay()
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             super.onFailure(webSocket, t, response)
+            CoroutineScope(Dispatchers.Main).launch {
+                isConnected = false
+            }
 //            CoroutineScope(Dispatchers.Main).launch{
 //                Toast.makeText(context, "离线异常！", Toast.LENGTH_SHORT).show()
 //            }
-            Log.e(TAG, "连接异常断开", t)
-            isConnected = false
             restartWebSocketWithDelay()
+            Log.e(TAG, "连接异常断开", t)
         }
 
 
         override fun onOpen(webSocket: WebSocket, response: Response) {
             super.onOpen(webSocket, response)
             onWSConnected()
-            isConnected = true
+            CoroutineScope(Dispatchers.Main).launch {
+                isConnected = true
+            }
             Log.i(TAG, "登录的webSocket连接成功！")
         }
 
         private fun restartWebSocketWithDelay() {
-            isConnected = false
             if (isLogin) {
                 try {
                     // 3秒后重连，避免频繁重连导致资源浪费或被封禁
@@ -555,7 +558,9 @@ suspend fun connectToWS(
                         CoroutineScope(Dispatchers.IO).launch {
                             connectToWS(onLogout,
                                 context, {
-                                    isConnected = true
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        isConnected = true
+                                    }
                                 }
                             )
                         }
@@ -565,8 +570,8 @@ suspend fun connectToWS(
                     CoroutineScope(Dispatchers.Main).launch {
                         Toast.makeText(context, "重新登录异常！", Toast.LENGTH_SHORT)
                             .show()
+                        isConnected = false
                     }
-                    isConnected = false
                 }
             }
         }
@@ -578,13 +583,17 @@ suspend fun connectToWS(
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
+            CoroutineScope(Dispatchers.Main).launch{
             isConnected = false
-            webSocketManager?.disconnect {
-                // 处理断网登出逻辑
-            }
+                }
         }
         override fun onAvailable(network: Network) {
-            // 网络恢复时，尝试重连
+//            Log.i(TAG, "网络恢复，尝试重连WebSocket")
+//            if (isLogin && !isConnected) {
+//                CoroutineScope(Dispatchers.IO).launch {
+//                    connectToWS(onLogout, context, onWSConnected = onWSConnected)
+//                }
+//            }
         }
     }
     connectivityManager.registerDefaultNetworkCallback(networkCallback)
