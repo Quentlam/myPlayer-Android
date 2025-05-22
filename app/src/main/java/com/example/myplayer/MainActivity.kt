@@ -61,7 +61,10 @@ package com.example.myplayer
             startDestination = "login"
         ) {
             composable("login") {
-                LoginScreen(onLoginSuccess = { isLoggedIn = true }, navController = navController,
+                LoginScreen(onLoginSuccess = {
+                    isLoggedIn = true
+                    isLogin = true
+                                             }, navController = navController,
                     onLogout = {
                         isLogin = false
                         isLoggedIn = false
@@ -95,7 +98,10 @@ package com.example.myplayer
         }
         else
         {
-            LoginScreen(onLoginSuccess = { isLoggedIn = true }, navController = navController,
+            LoginScreen(onLoginSuccess = {
+                isLoggedIn = true
+                isLogin = true
+                                         }, navController = navController,
                 onLogout = {
                     isLogin = false
                 isLoggedIn = false

@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -18,19 +19,18 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = Color(0xFFC94240),
+    secondary = Color(0xFFA73E52),
+    tertiary = Color(0xFFEBA9B7),
+    background = Color(0xFFFFF1F1),
+    surface = Color(0xFFFFF1F1),
+    error = Color(0xB00020), // 推荐 Material 默认错误红色，您也可以自定义
     onPrimary = Color.White,
     onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    onTertiary = Color(0xFF5F2A33),
+    onBackground = Color(0xFF2E1518),
+    onSurface = Color(0xFF2E1518),
+    onError = Color.White, // 错误色上文字颜色，一般白色
 )
 
 @Composable

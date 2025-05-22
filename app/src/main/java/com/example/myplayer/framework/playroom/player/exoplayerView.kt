@@ -1,5 +1,6 @@
 package com.example.myplayer.framework.playroom.player
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
@@ -53,6 +54,7 @@ private fun isSupportedFormat(url: String): Boolean {
     return supportedFormats.any { url.lowercase().endsWith(it) }
 }
 
+@SuppressLint("ContextCastToActivity")
 @androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(UnstableApi::class)
 @Composable
@@ -69,11 +71,14 @@ fun PlayerWithFloatingControls(
     val coroutineScope = rememberCoroutineScope()
     var isPlaying by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val orientation = configuration.orientation
-    val activity = (context as? Activity)
+    val activity = context as? Activity
 
-    // 监听生命周期，在Activity销毁时恢复竖屏
+
+
+    // 生命周期结束时恢复竖屏和系统UI
     DisposableEffect(Unit) {
         onDispose {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -81,7 +86,7 @@ fun PlayerWithFloatingControls(
         }
     }
 
-    // 处理返回按钮逻辑
+    // 返回键处理
     BackHandler(enabled = true) {
         if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -140,7 +145,7 @@ fun PlayerWithFloatingControls(
         }
     }
 
-    // 全屏时设置沉浸式，非全屏恢复状态
+    // 横屏时进入沉浸式全屏，竖屏时恢复
     LaunchedEffect(orientation) {
         if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
@@ -152,6 +157,7 @@ fun PlayerWithFloatingControls(
         controlsVisible = false
     }
 
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -160,55 +166,64 @@ fun PlayerWithFloatingControls(
                 interactionSource = remember { MutableInteractionSource() }
             ) {
                 controlsVisible = !controlsVisible
-                Log.d("exoPlayer", "controlsVisible = $controlsVisible")
                 if (controlsVisible) startAutoHideTimer()
             }
     ) {
+        // 播放器视图保持不变
         AndroidView(
-            factory = { context ->
-                PlayerView(context).apply {
+            factory = { ctx ->
+                PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = false
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
                 }
             },
-            update = { playerView ->
-                playerView.resizeMode = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                    AspectRatioFrameLayout.RESIZE_MODE_FILL
-                } else {
-                    AspectRatioFrameLayout.RESIZE_MODE_FIT
-                }
-                playerView.requestLayout()
-            },
-            modifier = Modifier.fillMaxSize()
+            modifier = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                Modifier
+                    .fillMaxSize()
+                    .align(Alignment.Center)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .align(Alignment.TopCenter)
+            }
         )
 
+        // 控制层容器
         AnimatedVisibility(
             visible = controlsVisible,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.fillMaxSize()
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // 顶部栏
+            // 使用Column来确保上中下三层的合理分布
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween // 确保三层均匀分布
+            ) {
+                // 顶部控制栏
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
+                        .weight(0.45f)
                 ) {
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = {
-                            if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                            } else {
-                                onBack()
-                            }
-                        }, modifier = Modifier.size(36.dp)) {
+                        IconButton(
+                            onClick = {
+                                if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                } else {
+                                    onBack()
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "返回",
@@ -221,24 +236,27 @@ fun PlayerWithFloatingControls(
                             color = Color.White,
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.width(44.dp))
                     }
                 }
 
-                // 中间区域 - 播放控制按钮
+                // 中间控制区域
                 Box(
                     modifier = Modifier
-                        .weight(1f)
                         .fillMaxWidth()
-                        .clickable { controlsVisible = !controlsVisible }
+                        .weight(0.6f) // 使用weight确保中间区域能够自适应
+                        .padding(vertical = 16.dp), // 添加垂直方向的 padding
+                    contentAlignment = Alignment.Center
                 ) {
                     Row(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(40.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
                         verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.wrapContentSize()
                     ) {
-                        // 快退15秒
                         IconButton(
                             onClick = {
                                 val newPos = (exoPlayer.currentPosition - 15_000).coerceAtLeast(0L)
@@ -246,10 +264,10 @@ fun PlayerWithFloatingControls(
                             },
                             modifier = Modifier.size(60.dp)
                         ) {
-                            Text("<< 15s", color = Color.White)
+                            Text("< 15s", color = Color.White)
                         }
 
-                        // 播放/暂停
+                        var isPlaying by remember { mutableStateOf(exoPlayer.isPlaying) }
                         IconButton(
                             onClick = {
                                 if (exoPlayer.isPlaying) {
@@ -270,7 +288,6 @@ fun PlayerWithFloatingControls(
                             )
                         }
 
-                        // 快进15秒
                         IconButton(
                             onClick = {
                                 val duration = exoPlayer.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
@@ -279,43 +296,50 @@ fun PlayerWithFloatingControls(
                             },
                             modifier = Modifier.size(60.dp)
                         ) {
-                            Text("15s >>", color = Color.White)
+                            Text("15s >", color = Color.White)
                         }
                     }
                 }
 
-                // 底部栏
-                Row(
+                // 底部进度条
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
-                        .padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .weight(0.45f)
                 ) {
-                    PlayerProgressBar(
-                        exoPlayer = exoPlayer,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    IconButton(onClick = {
-                        if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-                            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                        } else {
-                            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                        }
-                    }) {
-                        Icon(
-                            imageVector = if (orientation == Configuration.ORIENTATION_PORTRAIT)
-                                Icons.Filled.Fullscreen else Icons.Filled.FullscreenExit,
-                            contentDescription = "全屏切换",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PlayerProgressBar(
+                            exoPlayer = exoPlayer,
+                            modifier = Modifier.weight(1f)
                         )
+                        IconButton(onClick = {
+                            if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+                                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            } else {
+                                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            }
+                        }) {
+                            Icon(
+                                imageVector = if (orientation == Configuration.ORIENTATION_PORTRAIT)
+                                    Icons.Filled.Fullscreen else Icons.Filled.FullscreenExit,
+                                contentDescription = "全屏切换",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
             }
         }
     }
+
+
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
