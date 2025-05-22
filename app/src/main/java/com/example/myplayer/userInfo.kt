@@ -16,5 +16,6 @@ object userInfo {
     var u_id by mutableStateOf("")
     var friendList by mutableStateOf<List<UserInfo>>(emptyList())
     var isConnected by mutableStateOf(false)
+    var isLogin by mutableStateOf(false)
 }
 

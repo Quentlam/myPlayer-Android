@@ -30,6 +30,8 @@ package com.example.myplayer
     import com.example.myplayer.model.BaseInformation
     import com.example.myplayer.network.LoginRequest
     import com.example.myplayer.ui.theme.MyPlayerTheme
+    import com.example.myplayer.userInfo.isConnected
+    import com.example.myplayer.userInfo.isLogin
     import kotlinx.coroutines.launch
     import okio.IOException
     import kotlinx.coroutines.Dispatchers
@@ -59,11 +61,12 @@ package com.example.myplayer
             startDestination = "login"
         ) {
             composable("login") {
-                LoginScreen(
-                    onLoginSuccess =       { isLoggedIn = true },
-                    navController  =         navController,
-                    onLogout =             { isLoggedIn = false }
-                )
+                LoginScreen(onLoginSuccess = { isLoggedIn = true }, navController = navController,
+                    onLogout = {
+                        isLogin = false
+                        isLoggedIn = false
+                        isConnected = false
+                    })
             }
 
             composable("register") {
@@ -73,157 +76,31 @@ package com.example.myplayer
             }
 
             composable("main") {
-                HomeScreen(onLogout = { isLoggedIn = false })
+                HomeScreen(onLogout = {
+                    isLogin = false
+                    isLoggedIn = false
+                    isConnected = false
+                })
             }
         }
 
 
         if (isLoggedIn)
         {
-            HomeScreen(onLogout = { isLoggedIn = false })
+            HomeScreen(onLogout = {
+                isLogin = false
+                isLoggedIn = false
+                isConnected = false
+            })
         }
         else
         {
-            LoginScreen(onLoginSuccess = { isLoggedIn = true }, navController = navController, onLogout = { isLoggedIn = false })
+            LoginScreen(onLoginSuccess = { isLoggedIn = true }, navController = navController,
+                onLogout = {
+                    isLogin = false
+                isLoggedIn = false
+                isConnected = false
+                })
         }
 
     }
-
-    @Composable
-    fun login(
-        modifier: Modifier = Modifier
-            .fillMaxSize()
-            .wrapContentSize(Alignment.Center)
-    )
-    {
-        var account by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
-        var responseText by remember { mutableStateOf("") }
-        var baseResponse by remember { mutableStateOf<BaseResponseJsonData<String>>(BaseResponseJsonData<String>())}//用来接受响应体
-
-
-        var response:Response ?= null
-        val coroutineScope = rememberCoroutineScope()//创建协程
-        Column(
-            modifier = modifier,
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            TextField(account,onValueChange = {
-                currentText->account = currentText//每次都把输入的值给到account
-            })
-            TextField(password,onValueChange = {
-                    currentText->password = currentText//每次都把输入的值给到account
-            })
-
-            Button(onClick = {
-                val jsonList = listOf(
-                    BaseSentJsonData("u_account",account),
-                    BaseSentJsonData("u_password",password),
-                    )
-
-                coroutineScope.launch {
-                    withContext(Dispatchers.IO) {
-                        response = LoginRequest(jsonList,"/login").sendRequest(coroutineScope)
-                        if(response!!.isSuccessful)
-                        {
-                            baseResponse = JsonToBaseResponse<String>(response!!).getResponseData()
-                            responseText = response!!.body?.string() ?: ""
-                            //baseResponse = JsonToBaseResponse<String>(response!!).getResponseData()
-                            BaseInformation.account = account
-                            BaseInformation.account = password
-                        }
-                    }
-                }
-
-            })
-            {
-                Text("登录")
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            if(baseResponse.code != null)
-            {
-                Text("${baseResponse?.code}", modifier = Modifier.height(100.dp))
-            }
-            else
-            {
-                Text("当前baseResponse为空！", modifier = Modifier.height(100.dp))
-            }
-
-
-        }
-    }
-
-
-
-
-
-    @Composable
-    fun Test(
-        modifier: Modifier = Modifier
-            .fillMaxSize()
-            .wrapContentSize(Alignment.Center)
-    ) {
-        var account by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
-        var enterPassword by remember { mutableStateOf("") }
-        var verificationCode by remember { mutableStateOf("") }
-        var attributesOfName = listOf("账号", "密码", "确认密码", "验证码")
-        var baseResponse by remember { mutableStateOf<BaseResponseJsonData<String>>(BaseResponseJsonData<String>())}//用来接受响应体
-        var responseText by remember { mutableStateOf("") }
-
-
-        val coroutineScope = rememberCoroutineScope()
-
-        Column(
-            modifier = modifier,
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Button(onClick = {
-                coroutineScope.launch {
-                    //这里使用Dispatchers.IO是为了切换到一个适合I/O操作的线程
-                    withContext(Dispatchers.IO) {
-                        val response = LoginRequest(
-                            listOf(
-                                BaseSentJsonData(
-                                    "u_account", "1959804282@qq.com"
-                                ),
-                                BaseSentJsonData(
-                                    "u_password", "123456"
-                                )
-                            ),
-                            "/login"
-                        ).sendRequest(coroutineScope)//创建一个request对象
-                        if (!response!!.isSuccessful) throw IOException("请求失败: ${response.code}")
-                        else
-                        // 修改后代码片段：
-                        if (response != null && response!!.isSuccessful) {
-                            try {
-                                val responseBody = response!!.body?.string()
-                                if (!responseBody.isNullOrEmpty()) {
-                                    baseResponse = JsonToBaseResponse<String>(response!!).getResponseData()
-                                    withContext(Dispatchers.Main) {
-                                        responseText = responseBody
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    responseText = "响应解析异常"
-                                }
-                            }
-                        }
-                    }
-                }
-            })
-
-            {
-                Text("测试")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("${baseResponse?.code}", modifier = Modifier.height(100.dp))
-        }
-    }
-
-

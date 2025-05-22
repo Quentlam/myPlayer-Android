@@ -94,6 +94,7 @@ data class SynchronousResponseMessage(
 data class Message(
     override val r_id: String,
     val u_name: String,
+    val u_avatar: String,
     @SerialName("from") val fromUserId: String,
     val content: String,
     ) : RoomWebSocketMessage()
