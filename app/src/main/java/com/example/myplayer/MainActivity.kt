@@ -66,7 +66,8 @@ package com.example.myplayer
                 LoginScreen(onLoginSuccess = {
                     isLoggedIn = true
                     isLogin = true
-                                             }, navController = navController,
+                    navController.navigate("home") }
+                    , navController = navController,
                     onLogout = {
                         isLogin = false
                         isLoggedIn = false
@@ -76,11 +77,11 @@ package com.example.myplayer
 
             composable("register") {
                 RegisterScreen(
-                    onNavigateToLogin = { navController.navigate("Login") }
+                    onNavigateToLogin = { navController.navigate("login") }
                 )
             }
 
-            composable("main") {
+            composable("home") {
                 HomeScreen(onLogout = {
                     isLogin = false
                     isLoggedIn = false
@@ -88,27 +89,4 @@ package com.example.myplayer
                 })
             }
         }
-
-
-        if (isLoggedIn)
-        {
-            HomeScreen(onLogout = {
-                isLogin = false
-                isLoggedIn = false
-                isConnected = false
-            })
-        }
-        else
-        {
-            LoginScreen(onLoginSuccess = {
-                isLoggedIn = true
-                isLogin = true
-                                         }, navController = navController,
-                onLogout = {
-                    isLogin = false
-                isLoggedIn = false
-                isConnected = false
-                })
-        }
-
     }
