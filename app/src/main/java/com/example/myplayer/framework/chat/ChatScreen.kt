@@ -795,20 +795,22 @@ private fun FriendListItem(friend: UserInfo, onClick: () -> Unit) {
             if (friend.isChecked != 0) {
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
-                        .offset(x = (-2).dp, y = (-2).dp)
+                        .size(16.dp) // 这个Box定义了红色圆点的大小
+                        .offset(x = (-2).dp, y = (-2).dp) // 这个Box相对于头像的位置
                         .clip(CircleShape)
                         .background(Color.Red)
-                        .align(Alignment.TopStart),
-                    contentAlignment = Alignment.Center
+                        .align(Alignment.TopStart), // 这个Box在父Box (头像容器) 里的位置
+                    contentAlignment = Alignment.Center // <<< 这个属性让里面的Text居中！
                 ) {
                     Text(
-                        text = friend.isChecked.toString(),
+                        text = if(friend.isChecked < 99)friend.isChecked.toString() else "99+",
+                        modifier = Modifier.offset(y = (-2.4).dp), // 例如，向下微调1dp
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.wrapContentSize(align = Alignment.Center),
-                        textAlign = TextAlign.Center
+                        // 移除 Modifier.wrapContentSize，让父Box的contentAlignment起作用
+                        // Modifier = Modifier.wrapContentSize(align = Alignment.Center), // 移除或注释掉这行
+                        textAlign = TextAlign.Center // 保持这个，它让文字在Text自身的范围内水平居中
                     )
                 }
             }

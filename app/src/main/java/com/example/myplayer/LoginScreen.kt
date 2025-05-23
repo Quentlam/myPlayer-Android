@@ -83,9 +83,9 @@ fun LoginScreen(
     navController: NavHostController,
     onLogout: () -> Unit
 ) {
+    val context = LocalContext.current.applicationContext
     var account by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isRegister by remember { mutableStateOf(false) }
     var showErrorDialog by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
@@ -95,7 +95,6 @@ fun LoginScreen(
     val friendCoroutineScope = rememberCoroutineScope()
     val userInfoCoroutineScope = rememberCoroutineScope()
     var errorMessage by remember { mutableStateOf("") }
-    val context = LocalContext.current.applicationContext
 
     LaunchedEffect(Unit) {
         CoroutineScope(Dispatchers.IO).launch{
@@ -128,7 +127,6 @@ fun LoginScreen(
         )
     }
 
-    if (!isRegister) {
         // 背景渐变色，您可以换成自己喜欢的颜色或图片
         Box(
             modifier = Modifier
@@ -320,7 +318,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 TextButton(
-                    onClick = { isRegister = true },
+                    onClick = { navController.navigate("register") },
                     enabled = !loading,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -389,9 +387,6 @@ fun LoginScreen(
             }
 
         }
-    } else {
-        navController.navigate("register")
-    }
 }
 
 
@@ -549,8 +544,8 @@ suspend fun connectToWS(
 
         override fun onOpen(webSocket: WebSocket, response: Response) {
             super.onOpen(webSocket, response)
-            onWSConnected()
-            CoroutineScope(Dispatchers.Main).launch {
+            CoroutineScope(Dispatchers.Main).launch{
+                onWSConnected()
                 isConnected = true
             }
             Log.i(TAG, "登录的webSocket连接成功！")
@@ -584,26 +579,17 @@ suspend fun connectToWS(
         }
     }
     webSocketManager?.connect(listener)
-
-
-
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
-            CoroutineScope(Dispatchers.Main).launch{
-            isConnected = false
-                }
+            CoroutineScope(Dispatchers.Main).launch {
+                isConnected = false
+            }
         }
+
         override fun onAvailable(network: Network) {
-//            Log.i(TAG, "网络恢复，尝试重连WebSocket")
-//            if (isLogin && !isConnected) {
-//                CoroutineScope(Dispatchers.IO).launch {
-//                    connectToWS(onLogout, context, onWSConnected = onWSConnected)
-//                }
-//            }
+            Log.i(TAG, "网络恢复，尝试重连WebSocket")
         }
     }
     connectivityManager.registerDefaultNetworkCallback(networkCallback)
 }
-
-
