@@ -502,10 +502,17 @@ suspend fun connectToWS(
                             )
                         }
                         if (userInfo.currentFriend != data.sender) {
-                            CoroutineScope(Dispatchers.Default).launch {
-                                //Toast.makeText(context, "收到来自${data.sender_name}的消息: ${data.content}", Toast.LENGTH_SHORT).show()
-                                val notifyMsg = "收到来自${data.sender_name}的消息: ${data.content}"
-                                GlobalMessageNotifier.notify(notifyMsg)
+                            try {
+                                CoroutineScope(Dispatchers.Main).launch {
+                                    //Toast.makeText(context, "收到来自${data.sender_name}的消息: ${data.content}", Toast.LENGTH_SHORT).show()
+                                    val notifyMsg =
+                                        "收到来自${data.sender_name}的消息: ${data.content}"
+                                    GlobalMessageNotifier.notify(notifyMsg,context)
+                                    userInfo.friendList[userInfo.friendList.indexOfFirst { it.u_id == data.sender }].isChecked++
+                                }
+                            }
+                            catch (e: Exception) {
+                                Log.e(TAG, "收到来自${data.sender_name}的消息: ${data.content}失败！")
                             }
                         }
                         Log.i(TAG, "收到来自${data.sender_name}的消息: ${data.content}")
