@@ -1,5 +1,7 @@
 package com.example.myplayer.framework.chat
 
+import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.myplayer.framework.NotificationHelper
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
@@ -27,8 +30,15 @@ object GlobalMessageNotifier {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 10)
     val messages = _messages.asSharedFlow()
 
-    suspend fun notify(message: String) {
+    suspend fun notify(message: String,context : Context) {
+        Log.i("getMessage","发送信息：${message}")
         _messages.emit(message)
+        // 显示系统通知
+        NotificationHelper.showNotification(
+            context = context,
+            title = "新消息",
+            message = message
+        )
     }
 }
 

@@ -64,6 +64,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import coil.compose.rememberImagePainter
 import coil3.compose.AsyncImage
@@ -161,6 +162,7 @@ fun ChatScreen(
                             selectedFriend = friend
                             currentScreen = ChatScreenState.CHAT_DETAIL
                             onEnterChatDetialScreen()
+                            userInfo.friendList[userInfo.friendList.indexOfFirst { it.u_id == friend.u_id }].isChecked = 0
                         },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -683,6 +685,25 @@ private fun FriendListView(
     onFriendClick: (UserInfo) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 消息通知状态
+    var showMessage by remember { mutableStateOf(false) }
+    var messageContent by remember { mutableStateOf("") }
+
+    // 监听全局消息
+    LaunchedEffect(Unit) {
+        try {
+            Log.i("FriendsScreen", "开始监听信息")
+            GlobalMessageNotifier.messages.collect { message ->
+                Log.i("FriendsScreen", "收到消息: ${message}")
+                messageContent = message
+                showMessage = true
+            }
+        }
+        catch (e: Exception) {
+            println("接收消息失败: ${e.message}")
+        }
+
+    }
     Column(modifier = modifier) {
         if (!userInfo.isConnected) {
             Card(
@@ -718,6 +739,13 @@ private fun FriendListView(
                 }
             }
         }
+        // 显示消息通知
+        if (showMessage) {
+            TopMessageBanner(
+                message = messageContent,
+                onDismiss = { showMessage = false }
+            )
+        }
 
         Text(
             text = "myplayer",
@@ -745,24 +773,51 @@ private fun FriendListItem(friend: UserInfo, onClick: () -> Unit) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 头像
-        val imagePainter = rememberImagePainter(
-            data = friend.u_avatar,
-            builder = {
-                crossfade(true)
+        // 头像容器，使用Box来叠加标记
+        Box {
+            // 头像
+            val imagePainter = rememberImagePainter(
+                data = friend.u_avatar,
+                builder = {
+                    crossfade(true)
+                }
+            )
+            Image(
+                painter = imagePainter,
+                contentDescription = "用户头像",
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+
+            // 如果isChecked不为0，显示标记
+            if (friend.isChecked != 0) {
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .offset(x = (-2).dp, y = (-2).dp)
+                        .clip(CircleShape)
+                        .background(Color.Red)
+                        .align(Alignment.TopStart),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = friend.isChecked.toString(),
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.wrapContentSize(align = Alignment.Center),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
-        )
-        Image(
-            painter = imagePainter,
-            contentDescription = "用户头像",
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Crop
-        )
+        }
+
         Spacer(Modifier.width(16.dp))
         Text(text = friend.u_name, style = MaterialTheme.typography.bodyLarge)
     }
+
 }
 
 

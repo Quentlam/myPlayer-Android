@@ -67,6 +67,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import coil.compose.rememberImagePainter
+import com.example.myplayer.framework.chat.GlobalMessageNotifier
+import com.example.myplayer.framework.chat.TopMessageBanner
 import com.example.myplayer.model.BaseSentJsonData
 import com.example.myplayer.network.BaseRequest
 import kotlinx.coroutines.Job
@@ -120,6 +122,25 @@ fun FriendsScreen() {
 @SuppressLint("CoroutineCreationDuringComposition")
 @Composable
 fun FriendsListScreen(navController: NavController) {
+    // 消息通知状态
+    var showMessage by remember { mutableStateOf(false) }
+    var messageContent by remember { mutableStateOf("") }
+
+    // 监听全局消息
+    LaunchedEffect(Unit) {
+        try {
+            Log.i("FriendsScreen", "开始监听信息")
+            GlobalMessageNotifier.messages.collect { message ->
+                Log.i("FriendsScreen", "收到消息: ${message}")
+                messageContent = message
+                showMessage = true
+            }
+        }
+        catch (e: Exception) {
+            println("接收消息失败: ${e.message}")
+        }
+
+    }
 
     var isLoading by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -130,7 +151,7 @@ fun FriendsListScreen(navController: NavController) {
     var expanded by remember { mutableStateOf(false) } // 控制搜索栏展开状态
 
     var showInvitingDialog by remember { mutableStateOf(false) }
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
 
     // 在 FriendsListScreen 中更新搜索逻辑
     fun handleSearch(query: String) {
@@ -219,6 +240,13 @@ fun FriendsListScreen(navController: NavController) {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
+            // 显示消息通知
+            if (showMessage) {
+                TopMessageBanner(
+                    message = messageContent,
+                    onDismiss = { showMessage = false }
+                )
+            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showInvitingDialog = true }) {
@@ -231,7 +259,6 @@ fun FriendsListScreen(navController: NavController) {
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-
             Spacer(modifier = Modifier.height(16.dp))
 
             // 好友列表显示
@@ -415,7 +442,7 @@ private fun InvitingDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
 
     // 加载好友申请数据
     LaunchedEffect(showDialog) {
@@ -614,7 +641,7 @@ fun FriendDetailScreen(
 ) {
 
     val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
 
     Scaffold(
         topBar = {
