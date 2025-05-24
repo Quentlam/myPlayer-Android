@@ -102,8 +102,12 @@ fun SettingScreen(onLogout: () -> Unit) {
         SettingItem(
             title = "账号",
             value = account,
-            onClick = { showChangeAccountDialog = true }
+            onClick = {
+                showToastMessage("账号不可修改")
+            }
         )
+
+
 
         // 个性签名
         SettingItem(
@@ -136,9 +140,6 @@ fun SettingScreen(onLogout: () -> Unit) {
         }
     }
 
-    // 修改密码对话框
-// 2. Compose 层调用：根据 showChangePasswordDialog 控制弹窗，并调用 updatePassword
-// 2. Compose 层调用：按照你修改用户名时的调用方式
 // 2. Compose 层调用：按照 ChangeTextDialog 的例子去掉 title 参数
     if (showChangePasswordDialog) {
         ChangePasswordDialog(
@@ -159,9 +160,6 @@ fun SettingScreen(onLogout: () -> Unit) {
             }
         )
     }
-
-
-
 
     // 修改用户名对话框
     if (showChangeUsernameDialog) {
@@ -185,19 +183,6 @@ fun SettingScreen(onLogout: () -> Unit) {
         )
     }
 
-    // 修改账号对话框
-    if (showChangeAccountDialog) {
-        ChangeTextDialog(
-            title = "修改账号",
-            initialValue = account,
-            onDismiss = { showChangeAccountDialog = false },
-            onConfirm = { newValue ->
-                account = newValue
-                showChangeAccountDialog = false
-                showToastMessage("账号修改成功")
-            }
-        )
-    }
 
     // 修改个性签名对话框
     if (showChangeSignatureDialog) {
