@@ -8,5 +8,6 @@ import androidx.room.PrimaryKey
 data class LoginAccount(
     @PrimaryKey(autoGenerate = true)val id: Int? = 0,//自增id
     var account: String?,
-    var password: String?
+    var password: String?,
+    var isLogin : Boolean?
 )

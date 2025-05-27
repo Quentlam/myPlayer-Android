@@ -11,17 +11,25 @@ package com.example.myplayer
     import androidx.compose.runtime.mutableStateOf
     import androidx.compose.runtime.remember
     import androidx.compose.runtime.setValue
+    import androidx.compose.ui.platform.LocalContext
     import androidx.core.content.ContextCompat
     import androidx.navigation.compose.NavHost
     import androidx.navigation.compose.composable
     import androidx.navigation.compose.rememberNavController
     import com.example.myplayer.framework.NotificationHelper
+    import com.example.myplayer.framework.playroom.saveAccount
+    import com.example.myplayer.model.BaseInformation
+    import com.example.myplayer.model.DatabaseProvider
+    import com.example.myplayer.model.LoginAccount
     import com.example.myplayer.ui.theme.MyPlayerTheme
     import com.example.myplayer.userInfo.isConnected
     import com.example.myplayer.userInfo.isLogin
+    import kotlinx.coroutines.CoroutineScope
+    import kotlinx.coroutines.Dispatchers
+    import kotlinx.coroutines.launch
 
 
-    class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity() {
         private val requestPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { isGranted: Boolean ->
@@ -57,6 +65,8 @@ package com.example.myplayer
     fun AppNavigation() {
         val navController = rememberNavController()
         var isLoggedIn by remember { mutableStateOf(false) }
+        val context = LocalContext.current.applicationContext
+
 
         NavHost(
             navController = navController,
@@ -72,6 +82,13 @@ package com.example.myplayer
                         isLogin = false
                         isLoggedIn = false
                         isConnected = false
+                        CoroutineScope(Dispatchers.IO).launch{
+                            saveAccount(
+                                context,
+                                        LoginAccount(null,BaseInformation.account,BaseInformation.password,false)
+                            )
+                        }
+
                     })
             }
 
@@ -86,6 +103,13 @@ package com.example.myplayer
                     isLogin = false
                     isLoggedIn = false
                     isConnected = false
+                    navController.navigate("login")
+                    CoroutineScope(Dispatchers.IO).launch{
+                        saveAccount(
+                            context,
+                            LoginAccount(null,BaseInformation.account,BaseInformation.password,false)
+                        )
+                    }
                 })
             }
         }

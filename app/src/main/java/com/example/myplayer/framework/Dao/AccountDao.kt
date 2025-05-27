@@ -14,4 +14,6 @@ interface AccountDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAccount(account: LoginAccount):Unit
+
+
 }

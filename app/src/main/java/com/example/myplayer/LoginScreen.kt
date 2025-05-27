@@ -3,6 +3,7 @@ package com.example.myplayer
 import SHA256Util
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.IntentSender.OnFinished
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Handler
@@ -105,6 +106,20 @@ fun LoginScreen(
                     account = oldAccount.account.toString()
                     password = oldAccount.password.toString()
                     Log.d("LoginScreen", oldAccount.toString())
+
+                    val isLogin = dao.getLastInsertedAccount().isLogin!!
+                    if(isLogin)
+                    {
+                        login(
+                            account = account,
+                            password = password,
+                            onLoading = {loading = true},
+                            onFinished = {loading = false},
+                            context = context,
+                            onLogout = onLogout,
+                            onLoginSuccess = onLoginSuccess,
+                        )
+                    }
                 }
             }
             catch (e : Exception)
@@ -242,63 +257,22 @@ fun LoginScreen(
 
                 Button(
                     onClick = {
-                        loading = true
-                        coroutineScope.launch {
-                            withContext(Dispatchers.IO) {
-                                try {
-                                    val response = LoginRequest(
-                                        listOf(
-                                            BaseSentJsonData("u_account", account),
-                                            BaseSentJsonData(
-                                                "u_password",
-                                                SHA256Util.sha256Encrypt(password)
-                                            )
-                                        ), "/login"
-                                    ).sendRequest(coroutineScope)
-                                    val data = JsonToBaseResponse<String>(response).getResponseData()
-
-
-                                    if(data.code == 200) {
-                                        withContext(Dispatchers.Main) {
-                                            loading = false
-                                            BaseInformation.account = account
-                                            BaseInformation.password = SHA256Util.sha256Encrypt(password)
-                                            BaseInformation.token = data.data.toString()
-                                            Log.i("loginScreen", data.toString())
-                                            Log.i("loginScreen-token", BaseInformation.token)
-
-                                            saveAccount(
-                                                context,
-                                                LoginAccount(
-                                                    null,
-                                                    account,
-                                                    password
-                                                )
-                                            )
-                                            getUserInfo(friendCoroutineScope,context)
-                                            getFriendList(userInfoCoroutineScope,context)
-                                            connectToWS(onLogout, context, {
-                                                CoroutineScope(Dispatchers.Main).launch{
-                                                    Toast.makeText(context, "已登录！", Toast.LENGTH_SHORT).show()
-                                                }
-                                                onLoginSuccess()
-                                            })
-                                        }
-                                    }
-
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        loading = false
-                                        errorMessage = when (e) {
-                                            is IOException,
-                                            is SocketTimeoutException,
-                                            is UnknownHostException -> "网络异常，请检查网络连接"
-                                            else -> "登录失败，请检查账号或密码"
-                                        }
-                                        showErrorDialog = true
-                                    }
-                                    Log.d("loginScreen", e.toString())
-                                }
+                        if(account.isNotBlank() && password.isNotBlank())
+                        {
+                            login(
+                                account = account,
+                                password = password,
+                                onLoading = {loading = true},
+                                onFinished = {loading = false},
+                                context = context,
+                                onLogout = onLogout,
+                                onLoginSuccess = onLoginSuccess,
+                            )
+                        }
+                        else
+                        {
+                            CoroutineScope(Dispatchers.Main).launch{
+                                Toast.makeText(context, "账号密码不能为空！", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
@@ -592,4 +566,87 @@ suspend fun connectToWS(
         }
     }
     connectivityManager.registerDefaultNetworkCallback(networkCallback)
+}
+
+
+
+fun login(account : String,
+          password :String,
+          onLoading: () -> Unit,
+          onFinished: () -> Unit,
+          context: Context,
+          onLogout:() -> Unit,
+          onLoginSuccess: () -> Unit)
+{
+    try {
+        onLoading()
+        val originPassword = password
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val response = LoginRequest(
+                listOf(
+                    BaseSentJsonData("u_account", account),
+                    BaseSentJsonData(
+                        "u_password",
+                        SHA256Util.sha256Encrypt(password)
+                    )
+                ), "/login"
+            ).sendRequest(this)
+            val data = JsonToBaseResponse<String>(response).getResponseData()
+
+
+
+            if (data.code == 200) {
+                withContext(Dispatchers.Main) {
+                    onFinished()
+                    BaseInformation.account = account
+                    BaseInformation.password = originPassword
+                    BaseInformation.token = data.data.toString()
+                    Log.i("loginScreen", data.toString())
+                    Log.i("loginScreen-token", BaseInformation.token)
+
+                    saveAccount(
+                        context,
+                        LoginAccount(
+                            null,
+                            account,
+                            originPassword,
+                            true
+                        )
+                    )
+                    CoroutineScope(Dispatchers.IO).launch {
+                        getUserInfo(this, context)
+                    }
+                    CoroutineScope(Dispatchers.IO).launch {
+                        getFriendList(this, context)
+                    }
+                    connectToWS(onLogout, context, {
+                        CoroutineScope(Dispatchers.Main).launch {
+                            Toast.makeText(context, "已登录！", Toast.LENGTH_SHORT).show()
+                        }
+                        onLoginSuccess()
+                    })
+                }
+            }
+            if(data.code != 200)
+            {
+                onFinished()
+                CoroutineScope(Dispatchers.Main).launch {
+                    Toast.makeText(context, "登录失败，请检查账号或密码", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    } catch (e: Exception) {
+        CoroutineScope(Dispatchers.Main).launch {
+            onFinished()
+            val errorMessage = when (e) {
+                is IOException,
+                is SocketTimeoutException,
+                is UnknownHostException -> "网络异常，请检查网络连接"
+                else -> "登录失败，请检查账号或密码"
+            }
+            Toast.makeText(context, "${errorMessage}", Toast.LENGTH_SHORT).show()
+        }
+        Log.d("loginScreen", e.toString())
+    }
 }
