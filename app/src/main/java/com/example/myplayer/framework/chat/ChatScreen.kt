@@ -66,6 +66,7 @@ import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.navigation.NavController
 import coil.compose.rememberImagePainter
 import coil3.compose.AsyncImage
 import coil3.compose.ImagePainter
@@ -86,7 +87,8 @@ val chatMessagesMap = mutableStateMapOf<String, SnapshotStateList<ChatMessage>>(
 @Composable
 fun ChatScreen(
     onEnterChatDetialScreen: () -> Unit,
-    onExitChatDetialScreen: () -> Unit
+    onExitChatDetialScreen: () -> Unit,
+    navController : NavController
 ) {
     var currentScreen by remember { mutableStateOf(ChatScreenState.FRIEND_LIST) }
     var selectedFriend by remember { mutableStateOf<UserInfo?>(null) }
@@ -182,6 +184,7 @@ fun ChatScreen(
                         onBack = {
                             currentScreen = ChatScreenState.FRIEND_LIST
                             onExitChatDetialScreen()
+                            navController.navigate("chat")
                         },
                         onEnterChatDetialScreen = onEnterChatDetialScreen,
                         onMessageSent = { message ->

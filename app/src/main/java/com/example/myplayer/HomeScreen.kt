@@ -52,7 +52,9 @@ fun HomeScreen(onLogout: () -> Unit) {
         bottomBar = {
             if (!hideBottomBar) {
                 NavigationBar {
-                    val currentRoute = currentRoute(navController)
+                    val navBackStackEntry by navController.currentBackStackEntryAsState()
+                    val currentRoute = navBackStackEntry?.destination?.route
+                    
                     items.forEach { item ->
                         NavigationBarItem(
                             icon = { Icon(item.icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
@@ -60,7 +62,10 @@ fun HomeScreen(onLogout: () -> Unit) {
                             selected = currentRoute == item.route,
                             onClick = {
                                 navController.navigate(item.route) {
-                                    popUpTo(navController.graph.startDestinationId)
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        saveState = true
+                                    }
+                                    restoreState = true
                                     launchSingleTop = true
                                 }
                             }
@@ -78,7 +83,8 @@ fun HomeScreen(onLogout: () -> Unit) {
             composable("friends") { FriendsScreen() }
             composable("chat") { ChatScreen(
                 onEnterChatDetialScreen = { hideBottomBar = true },
-                onExitChatDetialScreen = { hideBottomBar = false }
+                onExitChatDetialScreen = { hideBottomBar = false },
+                navController = navController
             ) }
             composable("Me") { SettingScreen(onLogout) }
             composable("playroom") {
