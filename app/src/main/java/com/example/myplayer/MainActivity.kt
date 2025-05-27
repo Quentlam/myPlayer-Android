@@ -82,6 +82,9 @@ class MainActivity : ComponentActivity() {
                         isLogin = false
                         isLoggedIn = false
                         isConnected = false
+                        CoroutineScope(Dispatchers.Main).launch{
+                            navController.navigate("login")
+                        }
                         CoroutineScope(Dispatchers.IO).launch{
                             saveAccount(
                                 context,
@@ -103,7 +106,9 @@ class MainActivity : ComponentActivity() {
                     isLogin = false
                     isLoggedIn = false
                     isConnected = false
-                    navController.navigate("login")
+                    CoroutineScope(Dispatchers.Main).launch{
+                        navController.navigate("login")
+                    }
                     CoroutineScope(Dispatchers.IO).launch{
                         saveAccount(
                             context,

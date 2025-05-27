@@ -111,14 +111,15 @@ fun LoginScreen(
                     if(isLogin)
                     {
                         login(
-                            account = account,
-                            password = password,
+                            account = oldAccount.account.toString(),
+                            password = oldAccount.password.toString(),
                             onLoading = {loading = true},
                             onFinished = {loading = false},
                             context = context,
                             onLogout = onLogout,
                             onLoginSuccess = onLoginSuccess,
                         )
+                        Log.d("LoginScreen","登录旧帐号${oldAccount}")
                     }
                 }
             }
@@ -268,6 +269,7 @@ fun LoginScreen(
                                 onLogout = onLogout,
                                 onLoginSuccess = onLoginSuccess,
                             )
+                            Log.d("LoginScreen","登录新帐号${account}，${password}")
                         }
                         else
                         {
@@ -394,7 +396,6 @@ suspend fun getUserInfo(coroutineScope: CoroutineScope,context: Context) {
         } catch (e: Exception) {
             Log.e("LoginScreen", "获取用户信息异常：${e.message}")
             Toast.makeText(context, "获取用户信息异常！${e.message}", Toast.LENGTH_SHORT).show()
-            throw e
         }
     }
 }
@@ -522,7 +523,7 @@ suspend fun connectToWS(
                 onWSConnected()
                 isConnected = true
             }
-            Log.i(TAG, "登录的webSocket连接成功！")
+            Log.i(TAG, "登录的webSocket连接成功！1111111111111")
         }
 
         private fun restartWebSocketWithDelay() {
@@ -562,7 +563,6 @@ suspend fun connectToWS(
         }
 
         override fun onAvailable(network: Network) {
-            Log.i(TAG, "网络恢复，尝试重连WebSocket")
         }
     }
     connectivityManager.registerDefaultNetworkCallback(networkCallback)
@@ -581,7 +581,6 @@ fun login(account : String,
     try {
         onLoading()
         val originPassword = password
-
         CoroutineScope(Dispatchers.IO).launch {
             val response = LoginRequest(
                 listOf(
@@ -604,7 +603,7 @@ fun login(account : String,
                     BaseInformation.token = data.data.toString()
                     Log.i("loginScreen", data.toString())
                     Log.i("loginScreen-token", BaseInformation.token)
-
+                }
                     saveAccount(
                         context,
                         LoginAccount(
@@ -614,19 +613,19 @@ fun login(account : String,
                             true
                         )
                     )
-                    CoroutineScope(Dispatchers.IO).launch {
+                    CoroutineScope(Dispatchers.IO).launch {//这两部是异步操作！！！请一定要封装在一起，不然登录的时候u_id可能是个空值！！！
                         getUserInfo(this, context)
+                        connectToWS(onLogout, context, {
+                            CoroutineScope(Dispatchers.Main).launch {
+                                Toast.makeText(context, "已登录！", Toast.LENGTH_SHORT).show()
+                            }
+                            onLoginSuccess()
+                        })
                     }
                     CoroutineScope(Dispatchers.IO).launch {
                         getFriendList(this, context)
                     }
-                    connectToWS(onLogout, context, {
-                        CoroutineScope(Dispatchers.Main).launch {
-                            Toast.makeText(context, "已登录！", Toast.LENGTH_SHORT).show()
-                        }
-                        onLoginSuccess()
-                    })
-                }
+
             }
             if(data.code != 200)
             {
