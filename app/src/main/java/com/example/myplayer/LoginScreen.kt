@@ -613,7 +613,7 @@ fun login(account : String,
                             true
                         )
                     )
-                    CoroutineScope(Dispatchers.IO).launch {//这两部是异步操作！！！请一定要封装在一起，不然登录的时候u_id可能是个空值！！！
+                    CoroutineScope(Dispatchers.IO).launch {//这两步是异步操作！！！请一定要封装在一起，不然登录的时候u_id可能是个空值！！！
                         getUserInfo(this, context)
                         connectToWS(onLogout, context, {
                             CoroutineScope(Dispatchers.Main).launch {
